@@ -7,4 +7,4 @@
 # More info: https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
 
 # Global rule — all files owned by the whole Medlink-Ehealth org
-*   @Medlink-Ehealth
+*   @Medlink-Ehealth/developers
