@@ -1,0 +1,49 @@
+
+    <table width="100%" border="0" cellspacing="0" cellpadding="0">
+        <tr>
+            <td align="center" style="padding: 20px;">
+                <table class="content" width="600" border="0" cellspacing="0" cellpadding="0" style="border-collapse: collapse; border: 1px solid #cccccc;">
+                    <!-- Header -->
+                    <tr>
+                        <td class="header" style="background-color: #345C72; padding: 40px; text-align: center; color: white; font-size: 24px;">
+                         $${header placeholder}$$
+                        </td>
+                    </tr>
+
+                    <!-- Body -->
+                    <tr>
+                        <td class="body" style="padding: 20px; text-align: left; font-size: 16px; line-height: 1.6;">
+                        $${salutation placeholder}$$
+                        <br><br>
+                            $${greetings placeholder}$$        
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="body" style="padding: 20px; text-align: left; font-size: 16px; line-height: 1.6;">
+                            $${body placeholder}$$          
+                        </td>
+                    </tr>
+
+                    <!-- OTP Code -->
+                    <tr>
+                        <td style="padding: 0px 30px 0px 30px; text-align: center;">
+                            <table cellspacing="0" cellpadding="0" style="margin: auto;">
+                                <!-- Code -->                            
+                                <tr>
+                                    <td align="center" style="background-color: #345C72; padding: 10px 20px; border-radius: 5px; color: #ffffff; text-decoration: none; font-weight: bold;">
+                                        $${OTP code placeholder}$$
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+                    <!-- Footer -->
+                    <tr>
+                        <td class="footer" style="background-color: #333333; padding: 20px; text-align: center; color: white; font-size: 14px;">
+                        $${footer placeholder}$$
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>

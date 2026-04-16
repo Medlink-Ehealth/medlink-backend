@@ -1,0 +1,22 @@
+import validatorHandler, { phoneNumberValidator } from "./validatorHandler.js";
+import { aliasInjector } from "./operations/aliasInjector.js";
+import { mediaUpload, avatarUpload } from "./operations/mediaUpload.js";
+import checkAccount from "./accounts/checkAccount.js";
+import { dbQuerier } from "./dbQuerier.js";
+import { requestParser } from "./requestParser.js";
+import { Router } from "./router.js";
+import { otpLinkVerifier } from "./operations/otpLinkVerifier.js";
+import { otpVerifier } from "./operations/otpLinkVerifier.js";
+import { expressMiddleware } from "./operations/expressMiddleware.js";
+
+export { dbQuerier };
+export { phoneNumberValidator };
+export { validatorHandler };
+export { aliasInjector };
+export { mediaUpload };
+export { avatarUpload };
+export { checkAccount };
+export { requestParser };
+export { Router };
+export { otpLinkVerifier, otpVerifier };
+export { expressMiddleware };

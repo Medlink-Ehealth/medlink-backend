@@ -1,0 +1,46 @@
+{
+  "name": "medlink-poc-root",
+  "private": true,
+  "version": "0.0.1",
+  "author": "Akintunde Akin",
+  "description": "Central management for microservices",
+  "scripts": {
+    "dev": "pnpm -r --parallel run dev",
+    "auth": "pnpm --filter auth-service run dev",
+    "auth:db:sync": "tsx apps/auth-service/src/database/tablesDBsync",
+    "auth:db:tup": "tsx apps/auth-service/src/database/defaultTablesUp",
+    "build": "node build.mjs",
+    "build:auth": "pnpm build auth-service",
+    "build:order": "pnpm build order-service",
+    "build:all": "pnpm -r exec node ../../build.mjs",
+    "test": "pnpm -r run test",
+    "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
+    "format": "prettier --write \"**/*.{ts,js,json,md}\"",
+    "clean": "pnpm -r exec rm -rf node_modules dist"
+  },
+  "devDependencies": {
+    "@rollup/plugin-replace": "^6.0.3",
+    "@types/node": "^22.19.17",
+    "@typescript-eslint/eslint-plugin": "^8.58.0",
+    "@typescript-eslint/parser": "^8.58.0",
+    "cross-env": "^7.0.3",
+    "esbuild": "^0.28.0",
+    "eslint": "^9.39.4",
+    "eslint-plugin-jsdoc": "^50.8.0",
+    "koa2-swagger-ui": "^5.12.0",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.58.0",
+    "vitest": "^4.1.2"
+  },
+  "engines": {
+    "node": ">=20",
+    "pnpm": ">=8.0.0"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild",
+      "sharp",
+      "sqlite3"
+    ]
+  }
+}
