@@ -1,0 +1,10 @@
+# CODEOWNERS
+# This file defines code owners for the entire repository.
+# Code owners are automatically requested for review when a pull
+# request modifies code they own.
+#
+# Syntax: <pattern>  <owner> [<owner> ...]
+# More info: https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+# Global rule — all files owned by the whole Medlink-Ehealth org
+*   @Medlink-Ehealth
