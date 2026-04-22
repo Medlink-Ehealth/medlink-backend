@@ -1,0 +1,7 @@
+packages:
+  # all packages in direct subdirs of apps/
+  - 'apps/*'
+  # all shared functionality in directly in common/
+  - 'common'
+onlyBuiltDependencies:
+  - sqlite3

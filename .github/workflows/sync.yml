@@ -1,0 +1,105 @@
+name: Sync Source to dev-sync and Create PR
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:  # Allow manual trigger
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Destination Repository
+        uses: actions/checkout@v4
+        with:
+          repository: "Medlink-Ehealth/medlink-backend"
+          token: ${{ secrets.SYNC_TOKEN }}
+          fetch-depth: 0
+          ref: dev-sync  # Checkout dev-sync branch
+          
+      - name: Configure Git
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          
+      - name: Add Source Repository
+        env:
+          SOURCE_REPO: "DevAkintunde/medlink-poc"
+          TOKEN: ${{ secrets.SYNC_TOKEN }}
+        run: |
+          git remote add source "https://${TOKEN}@github.com/${SOURCE_REPO}.git"
+          git fetch source main
+          
+      - name: Merge Source Changes into dev-sync
+        run: |
+          # Merge source/main into dev-sync
+          # This works because dev-sync and main share history
+          git merge source/main --allow-unrelated-histories \
+            -m "Sync from source repository: ${GITHUB_SHA}" \
+            --no-edit
+          
+          # Push updated dev-sync
+          git push origin dev-sync
+          
+      - name: Create or Update Pull Request
+        env:
+          GH_TOKEN: ${{ secrets.SYNC_TOKEN }}
+        run: |
+          # Check if PR already exists
+          PR_EXISTS=$(gh pr list \
+            --repo "Medlink-Ehealth/medlink-backend" \
+            --head dev-sync \
+            --base main \
+            --state open \
+            --json number \
+            --jq '.[0].number')
+          
+          if [ -n "$PR_EXISTS" ]; then
+            echo "Updating existing PR #${PR_EXISTS}"
+            # PR automatically updates when dev-sync branch changes
+            gh pr edit "${PR_EXISTS}" \
+              --repo "Medlink-Ehealth/medlink-backend" \
+              --title "Sync from source repo - $(date +'%Y-%m-%d %H:%M')" \
+              --body "## Automated Sync
+              
+              **Source Commit**: ${GITHUB_SHA}
+              **Sync Time**: $(date)
+              
+              Changes have been merged into \`dev-sync\` and are ready for review.
+              
+              ### What changed:
+              - Latest updates from source repository
+              
+              ### Next Steps:
+              1. Review the changes
+              2. Run tests
+              3. Merge to main"
+          else
+            echo "Creating new PR"
+            gh pr create \
+              --repo "Medlink-Ehealth/medlink-backend" \
+              --head dev-sync \
+              --base main \
+              --title "Sync from source repo - $(date +'%Y-%m-%d %H:%M')" \
+              --body "## Automated Sync
+              
+              **Source Commit**: ${GITHUB_SHA}
+              **Sync Time**: $(date)
+              
+              This PR syncs changes from the source repository into \`dev-sync\`.
+              
+              ### What changed:
+              - Latest updates from source repository
+              
+              ### Review Checklist:
+              - [ ] Review changes
+              - [ ] Verify compatibility
+              - [ ] Run tests
+              - [ ] Merge to main
+              
+              ### Note:
+              The \`dev-sync\` branch will be updated automatically with future syncs."
+          fi

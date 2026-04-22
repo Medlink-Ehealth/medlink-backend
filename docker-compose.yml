@@ -1,0 +1,26 @@
+version: '3.8'
+
+services:
+  auth-service:
+    build:
+      context: .
+      dockerfile: ./apps/auth-service/Dockerfile
+    ports:
+      - "3001:3001"
+    environment:
+      - NODE_ENV=development
+
+  order-service:
+    build:
+      context: .
+      dockerfile: ./apps/order-service/Dockerfile
+    ports:
+      - "3002:3002"
+    environment:
+      - NODE_ENV=development
+
+  # Optional: Shared database for local testing
+  database:
+    image: postgres:15
+    environment:
+      POSTGRES_PASSWORD: example_password
