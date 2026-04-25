@@ -21,6 +21,7 @@ public/files
 package-lock.json
 pnpm-lock.yaml
 .envProjectRoot
+*/dbInit
 
 # Editor directories and files
 .vscode/*

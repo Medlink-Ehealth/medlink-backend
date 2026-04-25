@@ -48,17 +48,6 @@ const refreshAccessToken =
 			return;
 		}
 
-		/* Lets check our storage if refresh tokn exist. We ensure all refresh token are receeded with 'refresh:' for easy tracking */
-		const tokenExist = await storage.get(`refresh:${refreshToken}`);
-		// console.log("tokenExist:: ", tokenExist);
-
-		if (tokenExist !== "true") {
-			// let end it here if we cannot track Tokenctx.status = statusCodes.BAD_REQUEST;
-			ctx.status = statusCodes.NOT_FOUND;
-			ctx.message = "Refresh token is invalid";
-			return;
-		}
-
 		try {
 			const payload = await decryptToken(refreshToken);
 			if (payload && payload.error) {
@@ -80,7 +69,20 @@ const refreshAccessToken =
 					ctx.message = "Refresh token is invalid";
 					return;
 				}
-				const data = accountData["result" as keyof typeof payload] as object;
+				const data = accountData["result" as keyof typeof payload] as { [key: string]: string };
+				const accountUuid = data["uuid"];
+
+				/* Lets check our storage if refresh token exist on retrieved UUID. We ensure all refresh token are receeded with 'refresh:' for easy tracking */
+				const tokenExist = await storage.get(`refresh:${accountUuid}`);
+				// console.log("tokenExist:: ", tokenExist);
+
+				if (tokenExist !== refreshToken) {
+					// let end it here if we cannot track Token
+					ctx.status = statusCodes.NOT_FOUND;
+					ctx.message = "Refresh token is invalid";
+					return;
+				}
+
 				const responseBody: { token?: string; refreshToken?: string } = {};
 
 				const accessTokenLifetime = (
@@ -121,10 +123,8 @@ const refreshAccessToken =
 					);
 					if (typeof newRefreshToken === "string") {
 						responseBody["refreshToken"] = newRefreshToken;
-						// lets update storage, deleting previous record
-						if (storage instanceof Redis) await storage.del(`refresh:${refreshToken}`);
-						else storage.delete(`refresh:${refreshToken}`);
-						storage.set(`refresh:${newRefreshToken}`, "true");
+						// lets update storage
+						await storage.set(`refresh:${accountUuid}`, newRefreshToken);
 					}
 				}
 

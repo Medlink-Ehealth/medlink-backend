@@ -36,8 +36,6 @@ const userTypes = {
  *     summary: View current signed-in user setting
  *     security:
  *       - Token: []
- *     parameters:
- *       - $ref: '#/components/parameters/appID'
  *     responses:
  *       200:
  *         description: Returns the specific content fetched
@@ -140,8 +138,6 @@ router.get("/", async (ctx) => {
  *     description: ""
  *     security:
  *       - Token: []
- *     parameters:
- *       - $ref: '#/components/parameters/appID'
  *     requestBody:
  *       description: "Update user notifications setting. Kindly refer to the '/v1/s/config/user-setting' under the 'Platform Misc' to review the expected updated properties. Where an invalid label is provided, it would be ignored."
  *       required: true
@@ -226,7 +222,6 @@ router.post("/notifications", requestParser({ multipart: true }), async (ctx) =>
  *     security:
  *       - Token: []
  *     parameters:
- *       - $ref: '#/components/parameters/appID'
  *       - in: path
  *         name: action
  *         required: true
@@ -466,8 +461,6 @@ router.post("/2fa/:action", requestParser(), async (ctx) => {
  *     description: "Complete the 2FA activation process by providing a valid passcode from an authenticator app."
  *     security:
  *       - Token: []
- *     parameters:
- *       - $ref: '#/components/parameters/appID'
  *     requestBody:
  *       description: "Confirm enabling 2FA on the account by providing a valid passcode from an authenticator app. This is required to complete the activation process."
  *       required: true
@@ -614,7 +607,6 @@ router.post("/2fa/enable/confirm", requestParser(), async (ctx) => {
  *     security:
  *       - Token: []
  *     parameters:
- *       - $ref: '#/components/parameters/appID'
  *       - in: path
  *         name: action
  *         required: true

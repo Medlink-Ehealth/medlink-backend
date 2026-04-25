@@ -1,5 +1,5 @@
 import { Router, statusCodes } from "@medlink/common";
-import { siteConfig } from "./site.config.route.js";
+// import { siteConfig } from "./site.config.route.js";
 
 const router = Router("settings");
 /* 
@@ -17,6 +17,6 @@ router.use(async (ctx, next) => {
 	await next();
 });
 // site configuration updates. CONFIGs are saved as JSON
-router.use(siteConfig.routes());
+// router.use(siteConfig.routes());
 
 export { router as siteSettings };

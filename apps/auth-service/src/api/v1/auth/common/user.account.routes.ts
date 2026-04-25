@@ -26,12 +26,13 @@ import validator from "validator";
 import { adminFormValidator } from "../../../../validators/adminFormValidator.js";
 import config from "../../../../../app.config.js";
 import { updateAccount } from "../../../../controllers/account.controller.js";
+import { Cache, redis } from "../../../../performance.controller.js";
+import Redis from "ioredis";
 
 const router = Router();
 const userTypes = {
 	client: "Client",
 	admin: "Admin",
-	delivery_partner: "DeliveryPartner",
 };
 
 router.use(async (ctx, next) => {
@@ -57,7 +58,7 @@ router.use(async (ctx, next) => {
  *       - Token: []
  *     responses:
  *       200:
- *         description: Returns client/admin/delivery_partner(depending on the signed-in user) user data
+ *         description: Returns client/admin user data
  *         content:
  *           application/json: # Media type
  *             schema: # Must-have
@@ -72,8 +73,6 @@ router.use(async (ctx, next) => {
  *                       $ref: "#/components/schemas/Client"
  *                     - type: object
  *                       $ref: "#/components/schemas/Admin"
- *                     - type: object
- *                       $ref: "#/components/schemas/DeliveryPartner"
  *               example:
  *                 status: 200
  *                 account:
@@ -164,8 +163,10 @@ router.get("/me", async (ctx) => {
  *                 status: 409
  *                 statusText: Account already Signed Out
  */
-
-router.get("/logout", (ctx) => {
+/* 
+	- Note that this only clears the refresh token and makes it impossible to renew access token. However access token will still be valid until its own expiry. May optionally want to introduce a medium that keeps track of access token as well.
+*/
+router.get("/logout", async (ctx) => {
 	if (ctx.isAuthenticated()) {
 		//log signout of user to access stream
 		userAccessTimestampsLog(ctx.sequelizeInstance!, {
@@ -173,7 +174,14 @@ router.get("/logout", (ctx) => {
 			currentTime: false,
 			signedOutTime: true,
 		});
-		//create a way to check & destroy the current access token on sign account out
+		// flush refresh token record
+		const storage = redis ? redis : config.useCacheAsRedisIsNotAvailable ? Cache : null;
+		if (storage) {
+			const accountUuid = ctx.state.user["uuid"];
+			// lets update storage, deleting previous record
+			if (storage instanceof Redis) await storage.del(`refresh:${accountUuid}`);
+			else storage.delete(`refresh:${accountUuid}`);
+		}
 		ctx.status = statusCodes.OK;
 		ctx.body = { status: 200 };
 		return;
@@ -236,8 +244,6 @@ router.get("/logout", (ctx) => {
  *                       $ref: "#/components/schemas/Client"
  *                     - type: object
  *                       $ref: "#/components/schemas/Admin"
- *                     - type: object
- *                       $ref: "#/components/schemas/DeliveryPartner"
  *               example:
  *                 status: 200
  *                 account:

@@ -254,7 +254,8 @@ const signAccountInLocal =
 												accountData["refreshToken"] = refreshToken;
 												// we store refresh in redis for tracking. Cache can alternatively be used if enabled in config
 												const tokenStorage = redis ? redis : config.useCacheAsRedisIsNotAvailable ? Cache : null;
-												if (tokenStorage) tokenStorage.set(`refresh:${refreshToken}`, "true");
+												if (tokenStorage)
+													tokenStorage.set(`refresh:${accountData.account["uuid" as keyof typeof accountData.account]}`, refreshToken);
 											}
 										}
 
@@ -467,7 +468,8 @@ const signAccountInLocal =
 												accountData["refreshToken"] = refreshToken;
 												// we store refresh in redis for tracking. Cache can alternatively be used if enabled in config
 												const tokenStorage = redis ? redis : config.useCacheAsRedisIsNotAvailable ? Cache : null;
-												if (tokenStorage) tokenStorage.set(`refresh:${refreshToken}`, "true");
+												if (tokenStorage)
+													tokenStorage.set(`refresh:${accountData.account["uuid" as keyof typeof accountData.account]}`, refreshToken);
 											}
 										}
 
