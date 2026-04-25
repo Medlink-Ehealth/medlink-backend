@@ -5,19 +5,21 @@ import Joi from "joi";
 import JoiPhoneNumberExtend from "joi-phone-number";
 import { logger } from "../utils/logger.js";
 import { throwError } from "../functions/throwError.js";
+import { Sequelize } from "sequelize";
+import { RouterExtendedDefaultContext } from "./router.js";
 
-type JsonValue = JsonObject;
-type JsonObject = {
-	[key: string]: JsonValue;
-};
-interface extendedParameterizedContext extends ParameterizedContext {
-	request: DefaultContext["request"] & {
-		body?: JsonValue;
-		files?: [string, File]; // [formidable.Fields<string>, formidable.Files<string>]
-		rawBody?: unknown;
-	};
-	// sequelizeInstance: Sequelize;
-}
+// type JsonValue = JsonObject;
+// type JsonObject = {
+// 	[key: string]: JsonValue;
+// };
+// interface extendedParameterizedContext extends ParameterizedContext {
+// 	request: DefaultContext["request"] & {
+// 		body?: JsonValue;
+// 		files?: [string, File]; // [formidable.Fields<string>, formidable.Files<string>]
+// 		rawBody?: unknown;
+// 	};
+// 	sequelizeInstance: Sequelize;
+// }
 
 const joiPhoneNumber = Joi.extend(JoiPhoneNumberExtend);
 
@@ -27,9 +29,9 @@ const joiPhoneNumber = Joi.extend(JoiPhoneNumberExtend);
 	Also externalized phone number validator for reusability
  */
 export const phoneNumberValidator = async (
-	ctx: extendedParameterizedContext,
+	ctx: RouterExtendedDefaultContext,
 	next?: Next | { phoneNumber?: string; defaultCountry?: string; format?: "international" | "e164" | "national" | "RFC3966" },
-	options?: { phoneNumber?: string; defaultCountry?: string; format?: "international" | "e164" | "national" | "RFC3966" }
+	options?: { phoneNumber?: string; defaultCountry?: string; format?: "international" | "e164" | "national" | "RFC3966" },
 ) => {
 	// since next can exist or not, we need to check if it is a function or an object
 	if (typeof next !== "function") {
@@ -42,14 +44,14 @@ export const phoneNumberValidator = async (
 			.phoneNumber(
 				options
 					? { defaultCountry: options.defaultCountry || "NG", format: options.format || "e164" }
-					: { defaultCountry: "NG", format: "e164" }
+					: { defaultCountry: "NG", format: "e164" },
 			)
 			.validate((ctx.request.body?.phoneNumber && ctx.request.body?.phoneNumber.toString()) || options?.phoneNumber);
 		//console.log('error', error)
 		if (error) {
 			throwError(
 				NOT_ACCEPTABLE,
-				error.details[0].message.includes("string") ? "Phone number should be provided as string" : error.details[0].message
+				error.details[0].message.includes("string") ? "Phone number should be provided as string" : error.details[0].message,
 			);
 		} else {
 			if (ctx.request.body?.phoneNumber) {
@@ -69,12 +71,11 @@ export const phoneNumberValidator = async (
 	}
 };
 
-//sanitizeHtmlOptions is extra sanitizing options properties available in sanitize-html
 const validatorHandler = async (
-	ctx: extendedParameterizedContext,
+	ctx: RouterExtendedDefaultContext,
 	next: Next,
 	schema: Joi.ObjectSchema<unknown>,
-	sanitizeHtmlOptions?: { [key: string]: string }
+	sanitizeHtmlOptions?: { [key: string]: string },
 ) => {
 	try {
 		const { error } = schema.validate(ctx.request.body, {
@@ -95,7 +96,7 @@ const validatorHandler = async (
 				else if (typeof ctx.request.body[key] === "object") {
 					const stringifiedRequestBodyObjectValue = sanitizeHtml(
 						JSON.stringify(ctx.request.body[key]),
-						sanitizeHtmlOptions ? sanitizeHtmlOptions : undefined
+						sanitizeHtmlOptions ? sanitizeHtmlOptions : undefined,
 					);
 					ctx.request.body = {
 						...ctx.request.body,
@@ -103,15 +104,14 @@ const validatorHandler = async (
 					};
 				}
 			});
-			if (next) return next();
-			//Where next() is absent, return TRUE for successfull error-free validation
+			if (next) return await next();
 			else return true;
 		}
 		// eslint-disable-next-line @typescript-eslint/no-explicit-any
 	} catch (error: any) {
 		logger.error("Validator error: ", error);
-		// ctx.status = error.code ? error.code : NOT_ACCEPTABLE;
-		// ctx.message = error.message+'. Request body is likely missing or if available, not being parsed correctly';
+		ctx.status = NOT_ACCEPTABLE;
+		ctx.message = error.details[0].message.replace("/[^a-zA-Z0-9 ]/g", "");
 		return;
 	}
 };

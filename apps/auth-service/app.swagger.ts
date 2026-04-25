@@ -23,7 +23,7 @@ const serverAddress = config.serverAddress || "http://localhost";
 if (process.env.NODE_ENV !== "development") {
 	if (dbENV.length === 1) {
 		appServers.push({
-			url: config.serverAddress + "/api",
+			url: serverAddress + "/" + config.apiVersion,
 			description: "Live server",
 		});
 	} else {
@@ -36,7 +36,8 @@ if (process.env.NODE_ENV !== "development") {
 						? (tldPrefix.includes("://") ? tldPrefix.split("://")[0] + `://${env}.` : `${env}.`) + mainServerTldCount.join(".")
 						: serverAddress.includes("://")
 							? serverAddress.split("://").join(`://${env}.`)
-							: `${env}.` + serverAddress) + "/api",
+							: `${env}.` + serverAddress) +
+					("/" + config.apiVersion),
 				description: `${env.toUpperCase().substring(0, 1)}${env.toLowerCase().substring(1)} server`,
 			});
 		}
@@ -57,8 +58,8 @@ const swaggerUIoptions: Partial<KoaSwaggerUiOptions> = {
 		swaggerVersion: "x.x.x", // read from package.json,
 		validatorUrl: null, // disable swagger-ui validator
 	},
-	routePrefix: "/api/docs", // route where the view is returned
-	specPrefix: "/api/docs/spec", // route where the spec is returned
+	routePrefix: "/docs", // route where the view is returned
+	specPrefix: "/docs/spec", // route where the spec is returned
 	exposeSpec: false, // expose spec file
 	hideTopbar: false,
 	//favicon: "/favicon.png", // default favicon
@@ -68,7 +69,12 @@ const swaggerUIoptions: Partial<KoaSwaggerUiOptions> = {
 
 if (process.env.NODE_ENV !== "production")
 	appServers.unshift({
-		url: (process.env.localUrl ? process.env.localUrl : "http://localhost") + ":" + (process.env.PORT || process.env.port) + "/api/",
+		url:
+			(process.env.localUrl ? process.env.localUrl : "http://localhost") +
+			":" +
+			(process.env.PORT || process.env.port) +
+			"/" +
+			config.apiVersion,
 		description: "Local Dev Server",
 	});
 
@@ -76,7 +82,7 @@ const options = {
 	definition: {
 		openapi: "3.1.1",
 		info: {
-			title: config.sitename || config.sitenameFull + " API",
+			title: config.serviceName || config.projectName + " API",
 			version: "1.1.0", // consider import/syncing version with greybox core version
 			description: "API endpoints developed with Greybox",
 			/* contact: {
@@ -88,7 +94,15 @@ const options = {
 		servers: appServers,
 	},
 	// looks for configuration in specified directories
-	apis: ["src/**/*.routes.ts", "src/**/*.route.ts", "src/**/*.entry.ts", "src/**/*.router.ts", "src/**/*.model.ts", "src/**/*.doc.ts"], // files containing annotations as above
+	apis: [
+		`src/api/${config.apiVersion}/**/*.routes.ts`,
+		`src/api/${config.apiVersion}/**/*.route.ts`,
+		"src/**/*.entry.ts",
+		`src/api/${config.apiVersion}/**/*.router.ts`,
+		`src/api/api.entry.router.ts`,
+		"src/**/*.model.ts",
+		"src/**/*.doc.ts",
+	], // files containing annotations as above - keep in mind versioning
 };
 
 const swaggerSpec = (jsDocInfo?: (typeof options)["definition"]["info"]) => {
@@ -99,9 +113,10 @@ const swaggerSpec = (jsDocInfo?: (typeof options)["definition"]["info"]) => {
 };
 //console.log("swaggerSpec", swaggerSpec);
 
-const swaggerDocs = (jsDocInfo?: (typeof options)["definition"]["info"]) =>
+const swaggerDocs = (jsDocInfo: (typeof options)["definition"]["info"], swaggerSetup?: Partial<KoaSwaggerUiOptions>) =>
 	koaSwagger({
 		...swaggerUIoptions,
+		...(swaggerSetup ? swaggerSetup : {}),
 		...(swaggerConfigSetup ? swaggerConfigSetup : {}),
 		swaggerOptions: {
 			...swaggerUIoptions.swaggerOptions,

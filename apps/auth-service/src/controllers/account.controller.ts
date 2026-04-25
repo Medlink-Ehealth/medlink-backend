@@ -1,37 +1,33 @@
-import {
-	NOT_FOUND,
-	SERVER_ERROR,
-	OK,
-	SERVICE_UNAVAILABLE,
-	REDIRECTED,
-	NOT_ACCEPTABLE,
-	NOT_MODIFIED,
-	CONFLICT,
-	UNAUTHORIZED,
-	BAD_REQUEST,
-} from "../constants/statusCodes.js";
 import { ParameterizedContext, Next, DefaultContext } from "koa";
 import Passport from "koa-passport";
-import { UserSecurity } from "../models/UserSecurity.model.js";
 import {
 	alphaNumericCodeGenerator,
 	getOffsetTimestamp,
 	mailSender,
 	otpLinkGenerator,
 	userAccessTimestampsLog,
-} from "../functions/index.js";
-import { authenticateEncryptedToken, decryptToken, encryptionToken, validate2faCode } from "../utils/index.js";
+	authenticateEncryptedToken,
+	decryptToken,
+	encryptionToken,
+	validate2faCode,
+	statusCodes,
+	logger,
+	otpLinkVerifier,
+	UserSecurity,
+	defaultMailTemplate,
+	comparePassword,
+	hashPassword,
+	UserAccessTimestamp,
+	OTP,
+} from "@medlink/common";
+
 import fs from "node:fs";
-import { OTP } from "../models/OTP.model.js";
 import compose from "koa-compose";
-const { googleID, googleSECRET, fbID, fbSECRET } = process.env;
-import { UserAccessTimestamp } from "../models/UserAccessTimestamp.model.js";
 import { Op, Sequelize } from "sequelize";
-import config from "../../platform.config.js";
-import { logger } from "../utils/logger.js";
-import { compare, hash } from "../utils/password.js";
-import { defaultMailTemplate } from "../functions/mailTemplates/defaultMailTemplate.js";
-import { otpLinkVerifier } from "../middlewares/index.js";
+import config from "../../app.config.js";
+import { Cache, redis } from "../performance.controller.js";
+
+const { googleID, googleSECRET, fbID, fbSECRET } = process.env;
 
 type JsonValue = string | number | boolean | null | undefined | JsonObject | JsonArray;
 type JsonObject = {
@@ -86,13 +82,13 @@ const signAccountInLocal =
 		if (options && options.userType) ctx.header["x-usertype"] = options.userType;
 		// if still nothing
 		if (!ctx.header["x-usertype"]) {
-			ctx.status = SERVER_ERROR;
+			ctx.status = statusCodes.SERVER_ERROR;
 			ctx.message = "Unable to determine account model/type";
 			return;
 		}
 		if (!ctx.sequelizeInstance) {
 			logger.error("signAccountInLocal Error: ", "No active ctx.sequelizeInstance to match request to!");
-			ctx.status = SERVICE_UNAVAILABLE;
+			ctx.status = statusCodes.SERVICE_UNAVAILABLE;
 			return;
 		}
 
@@ -122,12 +118,13 @@ const signAccountInLocal =
 				return Passport.authenticate(localSignInType === "phoneNumber" ? "phoneNumber" : "local", async (err, user) => {
 					if (err) {
 						logger.error("Error:", err);
-						ctx.status = SERVICE_UNAVAILABLE;
+						ctx.status = statusCodes.SERVICE_UNAVAILABLE;
 						ctx.message = "Authentication service is unavailable";
 						return;
 					}
+					// console.log("user in singInLocal: ", user);
 					if (!user) {
-						ctx.status = NOT_FOUND;
+						ctx.status = statusCodes.NOT_FOUND;
 						ctx.message =
 							localSignInType === "phoneNumber" ? "Oops! Incorrect phone number or password" : "Oops! Incorrect email or password";
 						return;
@@ -139,6 +136,7 @@ const signAccountInLocal =
 							const validators2FA = userSecurity.dataValues["security"] && userSecurity.dataValues["security"]["2fa"];
 							twoFAstatus = validators2FA && validators2FA["verified"] ? true : false;
 						}
+						// console.log("userSecurity", userSecurity);
 						if (!twoFAstatus) {
 							//log signin to user signing-in access stream
 							const access = await userAccessTimestampsLog(ctx.sequelizeInstance!, {
@@ -162,7 +160,7 @@ const signAccountInLocal =
 								token?: string;
 								refreshToken?: string;
 							} = {
-								status: OK,
+								status: statusCodes.OK,
 								account: {
 									...user.toJSON(),
 									...extraData,
@@ -183,9 +181,9 @@ const signAccountInLocal =
 											? typeof options.refreshTokenLifetime === "function"
 												? options.refreshTokenLifetime(ctx)
 												: options.refreshTokenLifetime
-											: undefined;
+											: config.refreshTokenLifetime;
 
-									// Using refresh token is auto disabled if access token is greater than an hour and refreshTokenLifetime || accesssTokenLifetime is not explicitly set
+									// Using refresh token is auto disabled if access token is greater than 3 hour and refreshTokenLifetime || accesssTokenLifetime is not explicitly set
 									let ignoreRefreshToken: true | undefined = undefined;
 									if (accessTokenLifetime) {
 										let getTokenLifetime: number | undefined =
@@ -214,15 +212,16 @@ const signAccountInLocal =
 
 											if (!getTokenLifetime) accessTokenLifetime = undefined;
 
-											// one hour time
-											ignoreRefreshToken = getTokenLifetime && getTokenLifetime > 1000 * 60 * 60 ? true : undefined;
+											// three hour time
+											ignoreRefreshToken = getTokenLifetime && getTokenLifetime > 1000 * 60 * 60 * 3 ? true : undefined;
 										}
 									}
 
-									// where access token isn't expicitly set, we set this as 3 days and disable refresh token
+									// where access token isn't expicitly set, we check config
 									if (!accessTokenLifetime) {
-										accessTokenLifetime = config.authTokenValidity ? config.authTokenValidity + "d" : "3d";
-										if (!refreshTokenLifetime) ignoreRefreshToken = true;
+										accessTokenLifetime =
+											config.authTokenLifetime && !isNaN(Number(config.authTokenLifetime)) ? config.authTokenLifetime + "m" : "3d";
+										// if (!refreshTokenLifetime) ignoreRefreshToken = true;
 									}
 
 									const token = await encryptionToken(accountData.account, {
@@ -238,8 +237,8 @@ const signAccountInLocal =
 										const checkRefreshEnablement = !ignoreRefreshToken
 											? refreshTokenLifetime
 												? refreshTokenLifetime
-												: config.authTokenValidity
-													? config.authTokenValidity
+												: config.authTokenLifetime
+													? config.authTokenLifetime
 													: undefined
 											: undefined;
 										if (checkRefreshEnablement) {
@@ -251,7 +250,12 @@ const signAccountInLocal =
 													expiresIn: checkRefreshEnablement + "d",
 												},
 											);
-											if (typeof refreshToken === "string") accountData["refreshToken"] = refreshToken;
+											if (typeof refreshToken === "string") {
+												accountData["refreshToken"] = refreshToken;
+												// we store refresh in redis for tracking. Cache can alternatively be used if enabled in config
+												const tokenStorage = redis ? redis : config.useCacheAsRedisIsNotAvailable ? Cache : null;
+												if (tokenStorage) tokenStorage.set(`refresh:${refreshToken}`, "true");
+											}
 										}
 
 										//save token in websocket if available
@@ -260,7 +264,7 @@ const signAccountInLocal =
 												? { ...ctx.ioSocket.auth, token: token, refreshToken: accountData["refreshToken"] }
 												: { token: token, refreshToken: accountData["refreshToken"] };
 									} else {
-										ctx.status = SERVICE_UNAVAILABLE;
+										ctx.status = statusCodes.SERVICE_UNAVAILABLE;
 										ctx.message = "Currently unable to generate user access token.";
 										return;
 									}
@@ -268,7 +272,7 @@ const signAccountInLocal =
 									await ctx.login(accountData.account);
 								}
 							}
-							ctx.status = OK;
+							ctx.status = statusCodes.OK;
 							return (ctx.body = accountData);
 						} else {
 							user = user.toJSON();
@@ -284,10 +288,10 @@ const signAccountInLocal =
 									expiresIn: "180s",
 								},
 							);
-							ctx.status = REDIRECTED;
+							ctx.status = statusCodes.REDIRECTED;
 							return (ctx.body = {
 								data: { token: encodedUUID },
-								status: REDIRECTED,
+								status: statusCodes.REDIRECTED,
 								statusText:
 									"2FA is enabled on account. Get authenticator code and submit to the 2fa endpoint with the attached 'token' in this response. Token valid for 3 minutes",
 							});
@@ -303,11 +307,11 @@ const signAccountInLocal =
 
 				if (decryption && decryption.result) decodedUser = decryption.result;
 				else if (!decryption || (decryption && !decryption["result" as keyof typeof decryption])) {
-					ctx.status = BAD_REQUEST;
+					ctx.status = statusCodes.BAD_REQUEST;
 					ctx.message = "Invalid token provided";
 					return;
 				} else {
-					ctx.status = SERVICE_UNAVAILABLE;
+					ctx.status = statusCodes.SERVICE_UNAVAILABLE;
 					ctx.message = "2FA verification currently unavailable. Please try again later";
 					return;
 				}
@@ -324,7 +328,7 @@ const signAccountInLocal =
 								transaction: t,
 							});
 							if (userSecurity instanceof UserSecurity === false) {
-								ctx.status = SERVER_ERROR;
+								ctx.status = statusCodes.SERVER_ERROR;
 								ctx.message = "Unable to verify the security feature of this account. Please contact an admin";
 								return;
 								//throw new Error("Unable to verify the security feature of this account. Please contact an admin");
@@ -338,7 +342,7 @@ const signAccountInLocal =
 								userSecret: twoFAsecret,
 							});
 							if (!confirm2FA) {
-								ctx.status = BAD_REQUEST;
+								ctx.status = statusCodes.BAD_REQUEST;
 								ctx.message = "Incorrect authentication code";
 								return;
 								//throw new Error("Incorrect authentication code");
@@ -368,7 +372,7 @@ const signAccountInLocal =
 								token?: string;
 								refreshToken?: string;
 							} = {
-								status: OK,
+								status: statusCodes.OK,
 								account: {
 									...thisUser.toJSON(),
 									...extraData,
@@ -393,9 +397,9 @@ const signAccountInLocal =
 											? typeof options.refreshTokenLifetime === "function"
 												? options.refreshTokenLifetime(ctx)
 												: options.refreshTokenLifetime
-											: undefined;
+											: config.refreshTokenLifetime;
 
-									// Using refresh token is auto disabled if access token is greater than an hour and refreshTokenLifetime || accesssTokenLifetime is not explicitly set
+									// Using refresh token is auto disabled if access token is greater than 3 hour and refreshTokenLifetime || accesssTokenLifetime is not explicitly set
 									let ignoreRefreshToken: true | undefined = undefined;
 									if (accessTokenLifetime) {
 										let getTokenLifetime: number | undefined =
@@ -422,15 +426,16 @@ const signAccountInLocal =
 											getTokenLifetime = getTokenLifetimeUnit && getTokenLifetime * Number(getTokenLifetimeUnit);
 											// clear accessToken if getTokenLifetime is nullifid
 											if (!getTokenLifetime) accessTokenLifetime = undefined;
-											// one hour time
-											ignoreRefreshToken = getTokenLifetime && getTokenLifetime > 1000 * 60 * 60 ? true : undefined;
+											// 3 hour time
+											ignoreRefreshToken = getTokenLifetime && getTokenLifetime > 1000 * 60 * 60 * 3 ? true : undefined;
 										}
 									}
 
-									// where access token isn't expicitly set, we set this as 3 days and disable refresh token
+									// where access token isn't expicitly set, we check config
 									if (!accessTokenLifetime) {
-										accessTokenLifetime = config.authTokenValidity ? config.authTokenValidity + "d" : "3d";
-										if (!refreshTokenLifetime) ignoreRefreshToken = true;
+										accessTokenLifetime =
+											config.authTokenLifetime && !isNaN(Number(config.authTokenLifetime)) ? config.authTokenLifetime + "m" : "3d";
+										// if (!refreshTokenLifetime) ignoreRefreshToken = true;
 									}
 
 									const token = await encryptionToken(accountData.account, {
@@ -445,8 +450,8 @@ const signAccountInLocal =
 										const checkRefreshEnablement = !ignoreRefreshToken
 											? refreshTokenLifetime
 												? refreshTokenLifetime
-												: config.authTokenValidity
-													? config.authTokenValidity
+												: config.authTokenLifetime
+													? config.authTokenLifetime
 													: undefined
 											: undefined;
 										if (checkRefreshEnablement) {
@@ -458,7 +463,12 @@ const signAccountInLocal =
 													expiresIn: checkRefreshEnablement + "d",
 												},
 											);
-											if (typeof refreshToken === "string") accountData["refreshToken"] = refreshToken;
+											if (typeof refreshToken === "string") {
+												accountData["refreshToken"] = refreshToken;
+												// we store refresh in redis for tracking. Cache can alternatively be used if enabled in config
+												const tokenStorage = redis ? redis : config.useCacheAsRedisIsNotAvailable ? Cache : null;
+												if (tokenStorage) tokenStorage.set(`refresh:${refreshToken}`, "true");
+											}
 										}
 
 										//save token in websocket if available
@@ -467,7 +477,7 @@ const signAccountInLocal =
 												? { ...ctx.ioSocket.auth, token: token, refreshToken: accountData["refreshToken"] }
 												: { token: token, refreshToken: accountData["refreshToken"] };
 									} else {
-										ctx.status = SERVICE_UNAVAILABLE;
+										ctx.status = statusCodes.SERVICE_UNAVAILABLE;
 										ctx.message = "Currently unable to generate user access token.";
 										return;
 									}
@@ -479,25 +489,25 @@ const signAccountInLocal =
 						} else return;
 					});
 					if (user) {
-						ctx.status = OK;
+						ctx.status = statusCodes.OK;
 						return (ctx.body = user);
 					} else {
 						// ensure to not override an alreadt set status
 						if (!ctx.status) {
-							ctx.status = NOT_FOUND;
+							ctx.status = statusCodes.NOT_FOUND;
 							ctx.message = "Account does not exist";
 						}
 						return;
 					}
 				} else {
-					ctx.status = NOT_FOUND;
+					ctx.status = statusCodes.NOT_FOUND;
 					ctx.message = "Oops. We cannot sign you in currently. Please try sign-in later";
 					return;
 				}
 			}
 		} catch (err: unknown) {
 			logger.error("signAccountInLocal middleware sign-in Error: ", err);
-			ctx.status = SERVICE_UNAVAILABLE;
+			ctx.status = statusCodes.SERVICE_UNAVAILABLE;
 			ctx.message = "Oops. Currently unable to sign you in";
 			return;
 		}
@@ -516,12 +526,12 @@ const signAccountInOTP =
 					? ctx.state.userType
 					: undefined;
 		if (!userType) {
-			ctx.status = SERVER_ERROR;
+			ctx.status = statusCodes.SERVER_ERROR;
 			ctx.message = "Unable to determine account model/type";
 			return;
 		} else if (!ctx.sequelizeInstance) {
 			logger.error("signAccountInOTP Error: ", "No active ctx.sequelizeInstance to match request to!");
-			ctx.status = SERVICE_UNAVAILABLE;
+			ctx.status = statusCodes.SERVICE_UNAVAILABLE;
 			return;
 		}
 		//define role if not falsified
@@ -580,7 +590,7 @@ const signAccountInOTP =
 					account: object;
 					token?: string;
 				} = {
-					status: OK,
+					status: statusCodes.OK,
 					account: {
 						...user.toJSON(),
 						...extraData,
@@ -598,7 +608,7 @@ const signAccountInOTP =
 							//save token in websocket if available
 							if (ctx.ioSocket) ctx.ioSocket.auth = ctx.ioSocket.auth ? { ...ctx.ioSocket.auth, token: token } : { token: token };
 						} else {
-							ctx.status = SERVICE_UNAVAILABLE;
+							ctx.status = statusCodes.SERVICE_UNAVAILABLE;
 							ctx.message = "Currently unable to generate user access token.";
 							return;
 						}
@@ -607,135 +617,21 @@ const signAccountInOTP =
 					}
 				}
 				if (!next) {
-					ctx.status = OK;
+					ctx.status = statusCodes.OK;
 					return (ctx.body = accountData);
 				} else {
 					ctx.state.user = accountData;
 					await next();
 				}
 			} else {
-				ctx.status = BAD_REQUEST;
+				ctx.status = statusCodes.BAD_REQUEST;
 				ctx.message = "Currenty unable to identify account to sign in";
 				return;
 			}
 		} catch (err: unknown) {
 			logger.error("signAccountInOTP middleware sign-in Error: ", err);
-			ctx.status = SERVICE_UNAVAILABLE;
+			ctx.status = statusCodes.SERVICE_UNAVAILABLE;
 			ctx.message = "Oops. Currently unable to sign you in";
-			return;
-		}
-	};
-
-/**
- * Process refresh token for access token.
- * A form of storage mechanism must exist, like Redis or internal server used database, to take advantage of refresh token. Where not available, refreshtoken is completely disabled
- * Redis is likely the more preferred option than the internal database which server runs on
- *
- * @param {({
- * 			tokenStorage?: ({ oldToken, oldRefreshToken }: { oldToken: string; oldRefreshToken: string }) => boolean;
- * 			accessTokenLifetime?: string;
- * 			refreshTokenLifetime?: number;
- * 		} | void)} options
- * @returns {boolean; accessTokenLifetime?: string; refreshTokenLifetime?: number; }) => (ctx: extendedParameterizedContext, next?: Next) => unknown}
- */
-const refreshAccessToken =
-	(
-		options: {
-			tokenStorage?: ({ oldToken, oldRefreshToken }: { oldToken: string; oldRefreshToken: string }) => boolean;
-			accessTokenLifetime?: string;
-			refreshTokenLifetime?: number;
-		} | void,
-	) =>
-	async (ctx: extendedParameterizedContext, next?: Next) => {
-		if (!options || (options && !options.tokenStorage)) {
-			ctx.status = NOT_ACCEPTABLE;
-			ctx.message = "Using refresh token is not available on this serveer";
-			return;
-		} else if (!ctx.sequelizeInstance) {
-			logger.error("refreshAccessToken Error: ", "No active ctx.sequelizeInstance to match request to!");
-			ctx.status = SERVICE_UNAVAILABLE;
-			return;
-		}
-
-		// refresh token can be in custom request header value "x-refreshToken", in Bearer auth header, request body or as a query string
-		let refreshToken = ctx.header["x-refreshToken"]
-			? ctx.header["x-refreshToken"]
-			: ctx.body && ctx.request.body["refreshToken"]
-				? ctx.request.body["refreshToken"]
-				: undefined;
-		// check in query
-		if (!refreshToken && ctx.query && ctx.query["refreshToken"]) refreshToken = ctx.query["refreshToken"];
-		// check if defined on bearer auth header
-		if (!refreshToken) refreshToken = ctx.headers.authorization ? ctx.headers.authorization.split(" ")[1] : undefined;
-
-		if (!refreshToken) {
-			ctx.status = BAD_REQUEST;
-			ctx.message = "Refresh token not presence in the request";
-			return;
-		}
-
-		try {
-			const payload = await decryptToken(refreshToken);
-			if (payload && payload.error) {
-				//logger.error('Refresh token decryption error', payload.error)
-				ctx.status = payload.error["code" as keyof typeof payload.error];
-				ctx.message = payload.error["message" as keyof typeof payload.error];
-				return;
-			} else if (payload && payload["result" as keyof typeof payload]) {
-				// refresh token is double encryption
-				const accountData = await decryptToken(payload["result" as keyof typeof payload] as string);
-				if (accountData && accountData.error) {
-					//logger.error('Refresh token decryption error', payload.error)
-					ctx.status = SERVICE_UNAVAILABLE;
-					ctx.message = "Refreshing token error occurred";
-					return;
-				}
-				if (!accountData || (accountData && !accountData["result" as keyof typeof payload])) {
-					ctx.status = BAD_REQUEST;
-					ctx.message = "Refresh token is invalid";
-					return;
-				}
-				const data = accountData["result" as keyof typeof payload] as object;
-				const responseBody: { token?: string; refreshToken?: string } = {};
-
-				const accessToken = await encryptionToken(data, {
-					expiresIn: options && options.accessTokenLifetime ? options.accessTokenLifetime : "15m",
-				});
-				if (typeof accessToken === "string") responseBody["token"] = accessToken;
-
-				const refreshValidity =
-					options && options.refreshTokenLifetime
-						? options.refreshTokenLifetime
-						: config.authTokenValidity
-							? config.authTokenValidity
-							: undefined;
-				if (refreshValidity) {
-					const refreshToken = await encryptionToken(
-						(await encryptionToken(data, {
-							expiresIn: refreshValidity + "d",
-						})) as string,
-						{
-							expiresIn: refreshValidity + "d",
-						},
-					);
-					if (typeof refreshToken === "string") responseBody["refreshToken"] = refreshToken;
-				}
-				if (next) {
-					ctx.body = responseBody;
-					await next();
-				} else {
-					//ctx.status = 200;
-					return /* ctx.body = */ responseBody;
-				}
-			} else {
-				ctx.status = SERVICE_UNAVAILABLE;
-				ctx.message = "Unable to refresh token";
-				return;
-			}
-		} catch (err: unknown) {
-			logger.error("refreshAccessToken middleware Error: ", err);
-			ctx.status = SERVICE_UNAVAILABLE;
-			ctx.message = "Oops. Currently unable to process token refresh service";
 			return;
 		}
 	};
@@ -750,12 +646,12 @@ const updateAccount = (options?: { userType?: string }) => async (ctx: extendedP
 					? ctx.state.user.type
 					: undefined;
 	if (!userType) {
-		ctx.status = SERVER_ERROR;
+		ctx.status = statusCodes.SERVER_ERROR;
 		ctx.message = "Unable to determine account model/type";
 		return;
 	} else if (!ctx.sequelizeInstance) {
 		logger.error("updateAccount Error: ", "No active ctx.sequelizeInstance to match request to!");
-		ctx.status = SERVICE_UNAVAILABLE;
+		ctx.status = statusCodes.SERVICE_UNAVAILABLE;
 		return;
 	}
 	try {
@@ -776,13 +672,13 @@ const updateAccount = (options?: { userType?: string }) => async (ctx: extendedP
 			const updatedUser = await user.update(ctx.request.body);
 			ctx.state.updatedUser = updatedUser.toJSON();
 		} else {
-			ctx.status = NOT_MODIFIED;
+			ctx.status = statusCodes.NOT_MODIFIED;
 			ctx.message = "Unable to update account";
 			return;
 		}
 	} catch (err) {
 		logger.error("Account update error:", err);
-		ctx.status = SERVER_ERROR;
+		ctx.status = statusCodes.SERVER_ERROR;
 		ctx.message = "Unable to update account";
 		return;
 	}
@@ -816,13 +712,13 @@ const updateAccount = (options?: { userType?: string }) => async (ctx: extendedP
 const updateAccountPassword = (options?: { userType?: string }) => async (ctx: extendedParameterizedContext, next: Next) => {
 	if (!ctx.sequelizeInstance) {
 		logger.error("updateAccountPassword Error: ", "No active ctx.sequelizeInstance to match request to!");
-		ctx.status = SERVICE_UNAVAILABLE;
+		ctx.status = statusCodes.SERVICE_UNAVAILABLE;
 		return;
 	}
 	const { currentPassword, newPassword, repeatedNewPassword } = ctx.request.body;
 	try {
 		if (newPassword !== repeatedNewPassword) {
-			ctx.status = CONFLICT;
+			ctx.status = statusCodes.CONFLICT;
 			ctx.message = "Repeated new password is not the same";
 			return;
 		} else {
@@ -835,31 +731,31 @@ const updateAccountPassword = (options?: { userType?: string }) => async (ctx: e
 							? ctx.state.user.type
 							: undefined;
 			if (!userType) {
-				ctx.status = SERVER_ERROR;
+				ctx.status = statusCodes.SERVER_ERROR;
 				ctx.message = "Unable to determine account model/type";
 				return;
 			}
 
 			const user = await ctx.sequelizeInstance!.models[userType].scope("raw").findByPk(ctx.state.user.uuid);
 			if (user) {
-				if (compare(currentPassword, user.dataValues.password)) {
-					const hashedPassword = hash(newPassword.trim());
+				if (comparePassword(currentPassword, user.dataValues.password)) {
+					const hashedPassword = hashPassword(newPassword.trim());
 					await user.update({ password: hashedPassword });
 					await next();
 				} else {
-					ctx.status = CONFLICT;
+					ctx.status = statusCodes.CONFLICT;
 					ctx.message = "Incorrect current password";
 					return;
 				}
 			} else {
-				ctx.status = NOT_MODIFIED;
+				ctx.status = statusCodes.NOT_MODIFIED;
 				ctx.message = "Unable to update account password";
 				return;
 			}
 		}
 	} catch (err) {
 		logger.error("Password update error:", err);
-		ctx.status = SERVER_ERROR;
+		ctx.status = statusCodes.SERVER_ERROR;
 		ctx.message = "Unable to update password";
 		return;
 	}
@@ -881,7 +777,7 @@ const resetAccountPassword =
 	async (ctx: extendedParameterizedContext) => {
 		if (!ctx.sequelizeInstance) {
 			logger.error("resetAccountPassword Error: ", "No active ctx.sequelizeInstance to match request to!");
-			ctx.status = SERVICE_UNAVAILABLE;
+			ctx.status = statusCodes.SERVICE_UNAVAILABLE;
 			return;
 		}
 
@@ -899,13 +795,13 @@ const resetAccountPassword =
 						? ctx.state.userType
 						: undefined;
 		if (!userType) {
-			ctx.status = SERVER_ERROR;
+			ctx.status = statusCodes.SERVER_ERROR;
 			ctx.message = "Unable to determine account model/type";
 			return;
 		}
 
 		if ((!email && !phoneNumber) || (localSignInType === "email" && !email) || (localSignInType === "phoneNumber" && !phoneNumber)) {
-			ctx.status = BAD_REQUEST;
+			ctx.status = statusCodes.BAD_REQUEST;
 			ctx.message = `${localSignInType} needs to be provided in order toreset account password`;
 			return;
 		}
@@ -946,16 +842,16 @@ const resetAccountPassword =
 						},
 					});
 				}
-				ctx.status = OK;
+				ctx.status = statusCodes.OK;
 				return (ctx.body = {
-					status: OK,
+					status: statusCodes.OK,
 					statusText:
 						localSignInType === "email"
 							? "Password reset successful. Kindly check your email to complete reset"
 							: "Password reset successful. Kindly check your phone for code to complete reset",
 				});
 			}
-			ctx.status = NOT_FOUND;
+			ctx.status = statusCodes.NOT_FOUND;
 			ctx.message =
 				localSignInType === "email"
 					? "Oops! The email looks incorrect. Please verify the email and try again."
@@ -963,7 +859,7 @@ const resetAccountPassword =
 			return;
 		} catch (err) {
 			logger.error("Password reset error:", err);
-			ctx.status = SERVICE_UNAVAILABLE;
+			ctx.status = statusCodes.SERVICE_UNAVAILABLE;
 			return;
 		}
 	};
@@ -993,12 +889,12 @@ const signAccountInWithThirdParty =
 						? ctx.state.userType
 						: undefined;
 		if (!ctx.header["x-usertype"]) {
-			ctx.status = SERVER_ERROR;
+			ctx.status = statusCodes.SERVER_ERROR;
 			ctx.message = "Unable to determine account model/type";
 			return;
 		} else if (!ctx.sequelizeInstance) {
 			logger.error("signAccountInWithThirdParty Error: ", "No active ctx.sequelizeInstance to match request to!");
-			ctx.status = SERVICE_UNAVAILABLE;
+			ctx.status = statusCodes.SERVICE_UNAVAILABLE;
 			return;
 		}
 
@@ -1006,9 +902,9 @@ const signAccountInWithThirdParty =
 		appName = appName && appName.toLowerCase();
 		//console.log("appName", appName);
 		if (!["google", "facebook"].includes(appName)) {
-			ctx.status = SERVICE_UNAVAILABLE;
+			ctx.status = statusCodes.SERVICE_UNAVAILABLE;
 			ctx.body = {
-				status: SERVICE_UNAVAILABLE,
+				status: statusCodes.SERVICE_UNAVAILABLE,
 				statusText: appName
 					? "Sign-in with " + appName.toUpperCase() + " is currently not supported"
 					: "Currently unable to determine how you are signing in",
@@ -1018,9 +914,9 @@ const signAccountInWithThirdParty =
 		// check if user already signed in
 		if (ctx.isUnauthenticated()) await authenticateEncryptedToken(ctx);
 		if (ctx.isAuthenticated()) {
-			ctx.status = OK;
+			ctx.status = statusCodes.OK;
 			return (ctx.body = {
-				status: OK,
+				status: statusCodes.OK,
 				account: ctx.state.user,
 				statusText: "You are already signed In.",
 			});
@@ -1075,9 +971,9 @@ const signAccountInWithThirdParty =
 					logger.info(
 						"3rd PArty APP Sign In Error: Sign-in with google is enabled while both googleID && googleSECRET are not provided in environment variable. This will throw a Service Unavailable (503) Error.",
 					);
-					ctx.status = SERVICE_UNAVAILABLE;
+					ctx.status = statusCodes.SERVICE_UNAVAILABLE;
 					ctx.body = {
-						status: SERVICE_UNAVAILABLE,
+						status: statusCodes.SERVICE_UNAVAILABLE,
 						statusText: "Sign-in with " + appName.toUpperCase() + " is currently not available",
 					};
 					return;
@@ -1120,9 +1016,9 @@ const signAccountInWithThirdParty =
 					logger.info(
 						"3rd PArty APP Sign In Error: Sign-in with facebook is enabled while both fbID && fbSECRET are not provided in environment variable. This will throw a Service Unavailable (503) Error.",
 					);
-					ctx.status = SERVICE_UNAVAILABLE;
+					ctx.status = statusCodes.SERVICE_UNAVAILABLE;
 					ctx.body = {
-						status: SERVICE_UNAVAILABLE,
+						status: statusCodes.SERVICE_UNAVAILABLE,
 						statusText: "Sign-in with " + appName.toUpperCase() + " is currently not available",
 					};
 					return;
@@ -1153,18 +1049,18 @@ const signAccountInWithThirdPartyVerifier = (
 							? ctx.state.userType
 							: undefined;
 			if (!ctx.header["x-usertype"]) {
-				ctx.status = SERVER_ERROR;
+				ctx.status = statusCodes.SERVER_ERROR;
 				ctx.message = "Unable to determine account model/type";
 				return;
 			} else if (!ctx.sequelizeInstance) {
 				logger.error("signAccountInWithThirdPartyVerifier Error: ", "No active ctx.sequelizeInstance to match request to!");
-				ctx.status = SERVICE_UNAVAILABLE;
+				ctx.status = statusCodes.SERVICE_UNAVAILABLE;
 				return;
 			}
 			await next();
 			//displays a json body content if signing-in is unsuccessful, else REDIRECT as below for signAccountInWithThirdPartyValidateAs
 			if (ctx.state.redirectQuery) {
-				ctx.status = REDIRECTED;
+				ctx.status = statusCodes.REDIRECTED;
 				ctx.redirect((options && options.validationUrl ? options.validationUrl : "/sign-in-as?") + ctx.state.redirectQuery);
 			}
 			return;
@@ -1195,14 +1091,14 @@ const signAccountInWithThirdPartyVerifier = (
 					//profile //raw profile from social media account is available if ever needed
 				) => {
 					if (err) {
-						ctx.status = SERVER_ERROR;
+						ctx.status = statusCodes.SERVER_ERROR;
 						//Note: RETURNed ctx.body is directly printed to browser
 						return (ctx.body = err.message
 							? err.message
 							: "Error signing in using your social account. Please try again later; or use a different social media account/platform");
 					}
 					if (!userTokenisedEmail) {
-						ctx.status = NOT_FOUND;
+						ctx.status = statusCodes.NOT_FOUND;
 						//Note: RETURNed ctx.body is directly printed to browser
 						return (ctx.body = "Unable to signin using your social account.");
 					} else {
@@ -1235,12 +1131,12 @@ const signAccountInWithThirdPartyValidateAs =
 						? ctx.state.userType
 						: undefined;
 			if (!userModelType) {
-				ctx.status = SERVER_ERROR;
+				ctx.status = statusCodes.SERVER_ERROR;
 				ctx.message = "Unable to determine account model/type";
 				return;
 			} else if (!ctx.sequelizeInstance) {
 				logger.error("signAccountInWithThirdPartyValidateAs Error: ", "No active ctx.sequelizeInstance to match request to!");
-				ctx.status = SERVICE_UNAVAILABLE;
+				ctx.status = statusCodes.SERVICE_UNAVAILABLE;
 				return;
 			}
 			//define role if not falsified
@@ -1317,7 +1213,7 @@ const signAccountInWithThirdPartyValidateAs =
 				});
 			} else if (decoded && decoded["error" as keyof typeof decoded]) {
 				const errorMessage = decoded["error" as keyof typeof decoded];
-				ctx.status = UNAUTHORIZED;
+				ctx.status = statusCodes.UNAUTHORIZED;
 				ctx.message =
 					errorMessage && errorMessage["message" as keyof typeof errorMessage] === "TokenExpiredError"
 						? "Session expired. Please try signing in again"
@@ -1326,19 +1222,19 @@ const signAccountInWithThirdPartyValidateAs =
 			}
 			if (accountData && typeof accountData !== "string") {
 				if (!next) {
-					ctx.status = OK;
-					return (ctx.body = { status: OK, account: accountData });
+					ctx.status = statusCodes.OK;
+					return (ctx.body = { status: statusCodes.OK, account: accountData });
 				} else {
 					if (!ctx.state.user) ctx.state.user = accountData;
 					await next();
 				}
 			} else {
-				ctx.status = UNAUTHORIZED;
+				ctx.status = statusCodes.UNAUTHORIZED;
 				ctx.message = accountData ? accountData : "Oops! Currently unable to resolve your account detail.";
 				return;
 			}
 		} else {
-			ctx.status = BAD_REQUEST;
+			ctx.status = statusCodes.BAD_REQUEST;
 			ctx.message = "Unable to verify the status of your account.";
 			return;
 		}
@@ -1350,12 +1246,12 @@ const signAccountInWithThirdPartyValidateAs =
 const createAdminAccount = async (ctx: extendedParameterizedContext, next: Next) => {
 	if (!ctx.sequelizeInstance) {
 		logger.error("createAdminccount Error: ", "No active ctx.sequelizeInstance to match request to!");
-		ctx.status = SERVICE_UNAVAILABLE;
+		ctx.status = statusCodes.SERVICE_UNAVAILABLE;
 		return;
 	}
 
 	const { password } = ctx.request.body;
-	const hashedPassword = hash(password.trim());
+	const hashedPassword = hashPassword(password.trim());
 	// set account for deletion if unverified after 1 days (24hrs).
 	const setForUnverfiedDeletion = getOffsetTimestamp(1);
 	try {
@@ -1385,7 +1281,7 @@ const createAdminAccount = async (ctx: extendedParameterizedContext, next: Next)
 		} else {
 			logger.info("Account controller: Could not verify the creation of new account as true");
 			ctx.state.error = {
-				code: SERVER_ERROR,
+				code: statusCodes.SERVER_ERROR,
 				message: "Unable to verify new account",
 			};
 		}
@@ -1396,7 +1292,7 @@ const createAdminAccount = async (ctx: extendedParameterizedContext, next: Next)
 			err: err,
 		});
 		ctx.state.error = {
-			code: SERVER_ERROR,
+			code: statusCodes.SERVER_ERROR,
 			message: err.parent ? err.parent.detail : err.message ? err.message : "Unable to create account",
 		};
 	}
@@ -1404,7 +1300,6 @@ const createAdminAccount = async (ctx: extendedParameterizedContext, next: Next)
 };
 
 export {
-	refreshAccessToken,
 	signAccountInLocal,
 	signAccountInOTP,
 	updateAccount,

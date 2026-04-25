@@ -1,32 +1,36 @@
 {
   "name": "auth-service",
-  "description": "The Auth endpoint",
+  "description": "The Auth endpoints",
   "private": false,
-  "version": "2.0.1",
+  "version": "0.1.0",
   "type": "module",
-  "author": "Akintunde Akin",
   "engines": {
     "node": ">=20",
     "npm": ">=9.0.0"
   },
-  "main": "index.js",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/devakintunde/greybox"
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./config": {
+      "import": "./dist/config.js",
+      "types": "./dist/config.d.ts"
+    }
   },
   "scripts": {
     "dev": "tsx watch index.ts",
-    "test": "vitest",
-    "build": "vite build --config vite.build.config.ts",
-    "prepublishOnly": "npm run build",
-    "init:folders": "node pre.js",
-    "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0"
-  },
-  "pnpm": {
-    "onlyBuiltDependencies": [
-      "sqlite3",
-      "sharp"
-    ]
+    "prod": "node dist/index.js",
+    "db:sync": "tsx src/database/tablesDBsync",
+    "db:tup": "tsx src/database/defaultTablesUp",
+    "build": "tsc",
+    "build:watch": "tsc --watch",
+    "clean": "rm -rf dist *.tsbuildinfo",
+    "prebuild": "npm run clean",
+    "type-check": "tsc --noEmit",
+    "test": "vitest"
   },
   "dependencies": {
     "@azure/identity": "^4.13.1",

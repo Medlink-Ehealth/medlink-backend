@@ -1,6 +1,6 @@
 import { Totp, generateConfig, Hotp, generateSecret, generateBackupCodes } from "time2fa";
 import { logger } from "../logger.js";
-import config from "../../../platform.config.js";
+import { config } from "../../platform.config.js";
 
 /* 
     Implementation, time2fa library, of One-Time Password (OTP) authentication using HMAC-based One-Time Password (HOTP) and Time-based One-Time Password (TOTP) algorithms.
@@ -30,7 +30,7 @@ const generate2faSecret = ({
 	else {
 		const key = Totp.generateKey(
 			{
-				issuer: config.siteAddress || "Greybox",
+				issuer: config.serverAddress || "Greybox",
 				user: user,
 			},
 			{ secretSize: size, period: periodInSecond || 30 },

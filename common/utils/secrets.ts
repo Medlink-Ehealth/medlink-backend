@@ -2,6 +2,7 @@ import "dotenv/config";
 import { logger } from "./logger.js";
 import process from "node:process";
 // import config from "../../app.config.js";
+// console.log("process.env:", process.env);
 
 const { DB_HOST, DB_PORT, DB_USER, DB_PASS, DB_NAME, DB_SCHEMA, DIALECT, DB_SSL, DB_STORAGE } = process.env;
 // const { apiEndpoint } = config;

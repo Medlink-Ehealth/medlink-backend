@@ -8,6 +8,7 @@ import { mailSender } from "./mailSender.js";
 import { notificationLogger } from "./notificationLogger.js";
 import { storageConnector } from "./storageManager.js";
 import { userAccessTimestampsLog } from "./userAccessTimestampsLog.js";
+export * from "./mailTemplates/index.js";
 
 export { getOffsetTimestamp };
 export { alphaNumericCodeGenerator };

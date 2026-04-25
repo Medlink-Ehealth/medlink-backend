@@ -1,15 +1,17 @@
 import { Next } from "koa";
-import { AppContext } from "../../../../common/@types/utils.js";
-import { statusCodes } from "../../../../common/constants/index.js";
-import { otpLinkGenerator } from "../../../../common/functions/otpLinkGenerator.js";
-import { mailSender } from "../../../../common/functions/mailSender.js";
-import { logger } from "../../../../common/utils/logger.js";
-import { hashPassword } from "../../../../common/utils/index.js";
-import { getOffsetTimestamp } from "../../../../common/functions/getOffsetTimestamp.js";
-import { newUserAccountCreationTemplate } from "../../../../common/functions/mailTemplates/newUserAccountCreationTemplate.js";
 import { Client } from "../models/accounts/Client.model.js";
 import { Op } from "sequelize";
-import config from "../../../../platform.config.js";
+import {
+	AppContext,
+	getOffsetTimestamp,
+	hashPassword,
+	logger,
+	mailSender,
+	newUserAccountCreationTemplate,
+	otpLinkGenerator,
+	statusCodes,
+} from "@medlink/common";
+import config from "../../app.config.js";
 
 /**
  *  @description Middleware to create a user for platform, sending mail with verification link. Making this dynamic enough to be usable across any user account type
@@ -30,29 +32,18 @@ export const createNewAccount = (options?: { verificationExpiry: string | number
 	const { password, repeatedPassword } = ctx.request.body;
 	// ensure repeated password is same
 	if (password !== repeatedPassword) {
-		ctx.state.error = {
-			code: statusCodes.NOT_ACCEPTABLE,
-			message: "Repeated passwords must be the same.",
-		};
-		return await next();
+		ctx.status = statusCodes.NOT_ACCEPTABLE;
+		ctx.message = "Repeated passwords must be the same.";
+		return;
 	}
+
 	try {
-		// As a caution because of how the platform app works, by letting both CLient and Delivery Partners users to login on the same endpoint. An existing account in one cannot also exist in the other.
-		if (ctx.state.userType === "Client" || ctx.state.userType === "DeliveryPartner") {
-			const whereFilter =
-				ctx.request.body.email && ctx.request.body.phoneNumber
-					? {
-							[Op.or]: [{ email: ctx.request.body.email }, { phoneNumber: ctx.request.body.phoneNumber }],
-						}
-					: ctx.request.body.email
-						? { email: ctx.request.body.email }
-						: ctx.request.body.phoneNumber
-							? { phoneNumber: ctx.request.body.phoneNumber }
-							: null;
+		if (ctx.state.userType === "Client") {
+			const whereFilter = ctx.request.body.email ? { email: ctx.request.body.email } : null;
 			if (!whereFilter) {
 				ctx.state.error = {
 					code: statusCodes.BAD_REQUEST,
-					message: "Either email or phone number must be provided for registration",
+					message: "Either email must be provided for registration",
 				};
 				return await next();
 			}
@@ -81,8 +72,8 @@ export const createNewAccount = (options?: { verificationExpiry: string | number
 			const OTPvalueOrUrl = await otpLinkGenerator({
 				sequelize: ctx.sequelizeInstance,
 				entityReference: ctx.state.userType,
-				numberOfOTPChar: ctx.state.userType === "DeliveryPartner" ? 6 : 4,
-				typeOfOTPChar: ctx.state.userType === "DeliveryPartner" ? "alphanumeric" : "numbers",
+				numberOfOTPChar: 4,
+				typeOfOTPChar: "numbers",
 				queryIdentifier:
 					newUser.dataValues.email && newUser.dataValues.phoneNumber
 						? [newUser.dataValues.email, newUser.dataValues.phoneNumber]
@@ -91,8 +82,8 @@ export const createNewAccount = (options?: { verificationExpiry: string | number
 							: newUser.dataValues.phoneNumber,
 				log: `${ctx.state.userType}: New account creation`,
 				expiry: options && options.verificationExpiry ? options.verificationExpiry : "15m",
-				route: ctx.state.userType === "DeliveryPartner" ? "/api/v1/s/otp/newuser" : undefined, //available at dir system/otp/newUserVerify.routes
-				returnOTP: ctx.state.userType === "DeliveryPartner" ? false : true,
+				route: undefined, //available at dir system/otp/newUserVerify.routes
+				returnOTP: true,
 			});
 
 			if (OTPvalueOrUrl) {
@@ -111,22 +102,14 @@ export const createNewAccount = (options?: { verificationExpiry: string | number
 						subject: `New account creation for ${newUser.dataValues.firstName}`,
 						content: {
 							text: `Hello ${newUser.dataValues.firstName}. Your registration was successful. ${
-								ctx.state.userType === "DeliveryPartner"
-									? "Click the verification link: " +
-										(Array.isArray(OTPvalueOrUrl) ? OTPvalueOrUrl[0] : OTPvalueOrUrl) +
-										"&userType=DeliveryPartner"
-									: "Enter the code: " + (Array.isArray(OTPvalueOrUrl) ? OTPvalueOrUrl[0] : OTPvalueOrUrl)
+								"Enter the code: " + (Array.isArray(OTPvalueOrUrl) ? OTPvalueOrUrl[0] : OTPvalueOrUrl)
 							} to complete the process.`,
 							html: newUserAccountCreationTemplate({
-								verificationLink:
-									ctx.state.userType === "DeliveryPartner"
-										? (Array.isArray(OTPvalueOrUrl) ? OTPvalueOrUrl[0] : OTPvalueOrUrl) + `&userType=DeliveryPartner`
-										: undefined, //insert user account type as query to verification link
-								otp:
-									ctx.state.userType !== "DeliveryPartner" ? (Array.isArray(OTPvalueOrUrl) ? OTPvalueOrUrl[0] : OTPvalueOrUrl) : undefined,
+								verificationLink: undefined, //insert user account type as query to verification link
+								otp: Array.isArray(OTPvalueOrUrl) ? OTPvalueOrUrl[0] : OTPvalueOrUrl,
 								greetings: "Welcome to the family",
 								name: newUser.dataValues.firstName,
-								body: `${config.sitename} is this easy! Welcome on board.
+								body: `${config.projectName} is this easy! Welcome on board.
 								<br> Complete the sign up process providing the code to the App. Code is only valid for 15 minutes only`,
 								footer: "Once again, welcome!",
 							}),

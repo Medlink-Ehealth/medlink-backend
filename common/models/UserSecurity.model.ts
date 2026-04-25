@@ -8,28 +8,29 @@ const instances = Object.values(sequelizeInstances);
  * components:
  *   schemas:
  *     UserSecurity:
- *       description: Core Model
+ *       description: This model is internally attached to Each type of user. There is no direct interaction of Frontend with this model, but available for reference purposes
  *       type: object
  *       properties:
  *         user_uuid:
  *           type: string
  *           format: uuid
- *           description: Specific user UUID is required to get associated User security setting
- *         security:
+ *           description: Specific associated user UUID
+ *         '2fa':
  *           type: object
- *           description: Extra account security add-ons features
  *           properties:
- *             '2fa':
- *               type: object
- *               properties:
- *                 verified: boolean
- *             'recovery_emails':
- *               type: object
- *               properties:
- *                 email: string
- *                 verified: boolean
- *       required:
- *         - user_uuid
+ *             verified:
+ *               type: boolean
+ *               description: Indicates if 2FA is enabled or not
+ *         'recovery_emails':
+ *           type: array
+ *           items:
+ *             type: object
+ *             description: AN array of emails added to user account for recovery eligibility
+ *             properties:
+ *               email:
+ *                 type: string
+ *               verified:
+ *                 type: string
  */
 
 const PROTECTED_ATTRIBUTES = ["security"];

@@ -8,6 +8,7 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
+# Dir and files
 node_modules
 apps/*/node_modules
 site/files
@@ -19,6 +20,7 @@ public/files
 *.env
 package-lock.json
 pnpm-lock.yaml
+.envProjectRoot
 
 # Editor directories and files
 .vscode/*
@@ -30,3 +32,12 @@ pnpm-lock.yaml
 *.njsproj
 *.sln
 *.sw?
+
+# Diagnostic reports (https://nodejs.org/api/report.html)
+report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
+
+# TypeScript cache
+*.tsbuildinfo
+
+# Optional npm cache directory
+.npm

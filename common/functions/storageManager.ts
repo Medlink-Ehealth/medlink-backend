@@ -15,7 +15,7 @@ import EventEmitter from "node:events";
 import url from "node:url";
 import { appInstance } from "../server.js";
 import { logger } from "../utils/logger.js";
-import config from "../../platform.config.js";
+import { config } from "../platform.config.js";
 import { throwError } from "./throwError.js";
 import { statusCodes } from "../constants/index.js";
 import { AppContext } from "../@types/index.js";
@@ -406,7 +406,7 @@ class LocalStorageService {
 					const ext = reqOrStream.mimetype.includes(",")
 						? reverseMimetypesToExt(reqOrStream.mimetype.split(",")[0])
 						: reverseMimetypesToExt(reqOrStream.mimetype);
-					const fileName = (config.sitename ? config.sitename.split(" ").join("") + "-" : "") + "-" + Date.now().toString() + ext;
+					const fileName = (config.serviceName ? config.serviceName.split(" ").join("") + "-" : "") + "-" + Date.now().toString() + ext;
 
 					// let put toget the destination dir
 					let destinationFolder = reqOrStream.mimetype
@@ -503,7 +503,7 @@ class LocalStorageService {
 							return (
 								(disableFileNameRewrite
 									? name.replace(/[^a-zA-Z0-9 ]/g, "-") // lets strip special characters that may exist
-									: (config.sitename ? config.sitename.split(" ").join("") + "-" : "") + part.name + "-" + Date.now().toString()) + ext
+									: (config.serviceName ? config.serviceName.split(" ").join("") + "-" : "") + part.name + "-" + Date.now().toString()) + ext
 							);
 						},
 					});
@@ -649,7 +649,7 @@ class LocalStorageService {
 				}
 
 				if (!fileName)
-					fileName = (config.sitename ? config.sitename.split(" ").join("") + "-" : "") + Date.now().toString() + "." + fileMeta.ext;
+					fileName = (config.serviceName ? config.serviceName.split(" ").join("") + "-" : "") + Date.now().toString() + "." + fileMeta.ext;
 				else if (!fileName.includes(".")) fileName = fileName + "." + fileMeta.ext;
 
 				const isSvg = fileMeta.mime === "image/svg+xml" || fileName.toLowerCase().endsWith(".svg");
@@ -1429,7 +1429,7 @@ class AzureStorageService {
 						return (
 							(disableFileNameRewrite
 								? name.replace(/[^a-zA-Z0-9 ]/g, "-") // lets strip special characters that may exist
-								: (config.sitename ? config.sitename.split(" ").join("") + "-" : "") + part.name + "-" + Date.now().toString()) + ext
+								: (config.serviceName ? config.serviceName.split(" ").join("") + "-" : "") + part.name + "-" + Date.now().toString()) + ext
 						);
 					},
 					fileWriteStreamHandler(file?: VolatileFile | undefined) {
@@ -1626,7 +1626,7 @@ class AzureStorageService {
 				);
 
 				if (!fileName)
-					fileName = (config.sitename ? config.sitename.split(" ").join("") + "-" : "") + Date.now().toString() + "." + fileMeta.ext;
+					fileName = (config.serviceName ? config.serviceName.split(" ").join("") + "-" : "") + Date.now().toString() + "." + fileMeta.ext;
 				else if (!fileName.includes(".")) fileName = fileName + "." + fileMeta.ext;
 
 				const isSvg = fileMeta.mime === "image/svg+xml" || fileName.toLowerCase().endsWith(".svg");

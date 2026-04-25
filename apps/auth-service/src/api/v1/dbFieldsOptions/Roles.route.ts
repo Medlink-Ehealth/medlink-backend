@@ -1,6 +1,5 @@
-import { OK, SERVER_ERROR, UNAUTHORIZED } from "../../../constants/statusCodes.js";
-import { Router } from "../../../middlewares/router.js";
-import { Role } from "../../../models/fields/UserRole.model.js";
+import { Router, statusCodes } from "@medlink/common";
+import { AdminRole } from "../../../models/accounts/index.js";
 
 const router = Router({
 	prefix: "/roles",
@@ -9,7 +8,7 @@ const router = Router({
 /**
  * Let's list all available user roles, requiring authenticated access
  * openapi
- * /v3/field/auth/roles:
+ * /field/auth/roles:
  *   get:
  *     tags:
  *       - Core Basics
@@ -42,29 +41,29 @@ const router = Router({
 router.get("/", async (ctx) => {
 	if (ctx.state.user.role && Number(ctx.state.user.role) > 3) {
 		try {
-			const roles = await Role(ctx.sequelizeInstance!).findAll();
+			const roles = await AdminRole(ctx.sequelizeInstance!).findAll();
 			if (roles) {
-				ctx.status = OK;
+				ctx.status = statusCodes.OK;
 				ctx.body = {
-					status: OK,
+					status: statusCodes.OK,
 					options: roles,
 				};
 				return;
 			}
-			ctx.status = OK;
+			ctx.status = statusCodes.OK;
 			ctx.body = {
-				status: OK,
+				status: statusCodes.OK,
 				options: {},
 			};
 			return;
 			// eslint-disable-next-line @typescript-eslint/no-unused-vars
 		} catch (err) {
-			ctx.status = SERVER_ERROR;
+			ctx.status = statusCodes.SERVER_ERROR;
 			ctx.message = "Server error";
 			return;
 		}
 	} else {
-		ctx.status = UNAUTHORIZED;
+		ctx.status = statusCodes.UNAUTHORIZED;
 		ctx.message = "Oops! Unauthorised access";
 	}
 });

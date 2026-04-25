@@ -1,7 +1,6 @@
 import { Op } from "sequelize";
-import { Notification } from "../../../../../../common/models/Notification.model.js";
-import { AdminRole } from "../../../models/accounts/AdminRole.model.js";
-import { dbQuerier, Router, statusCodes } from "@medlink/common";
+import { dbQuerier, Notification, Router, statusCodes } from "@medlink/common";
+import { AdminRole } from "../../../../models/accounts/AdminRole.model.js";
 
 const router = Router({
 	prefix: "/notifications",
@@ -171,4 +170,4 @@ router.get("/:uuid/read", async (ctx) => {
 	}
 });
 
-export default router;
+export { router as notificaions };

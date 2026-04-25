@@ -2,7 +2,7 @@ import fs from "node:fs";
 import { logger } from "../utils/logger.js";
 import { DB_HOST, DB_STORAGE, DB_PORT, DB_USER, DB_PASS, DB_NAME, DB_SCHEMA, DIALECT, DB_SSL } from "../utils/secrets.js";
 import { Dialect, Sequelize } from "sequelize";
-import config from "../../platform.config.js";
+import { config } from "../platform.config.js";
 
 let requireDB = true;
 /**

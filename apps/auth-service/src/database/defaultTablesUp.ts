@@ -3,6 +3,17 @@ import { Admin } from "../models/accounts/Admin.model.js";
 
 const instances = Object.values(sequelizeInstances);
 
+type adminType = {
+	firstName: string;
+	lastName: string;
+	email: string;
+	password: string;
+	role: number;
+	state: boolean;
+	uuid: `${string}-${string}-${string}-${string}-${string}`;
+	type: "admin";
+};
+
 async function defaultTablesUp() {
 	const defaultAdmin = {
 		firstName: "Akintunde",
@@ -29,8 +40,8 @@ async function defaultTablesUp() {
 						transaction: t,
 					});
 					if (!checkExistingAdminAccounts || (checkExistingAdminAccounts && checkExistingAdminAccounts.length === 0)) {
-						await Admin(sequelize).create(defaultDev, { transaction: t });
-						await Admin(sequelize).create(defaultAdmin, { transaction: t });
+						await Admin(sequelize).create(defaultDev as adminType, { transaction: t });
+						await Admin(sequelize).create(defaultAdmin as adminType, { transaction: t });
 					}
 					logger.info("Default Tables UP");
 					return true;

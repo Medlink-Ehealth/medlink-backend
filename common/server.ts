@@ -23,8 +23,7 @@ import Redis from "ioredis";
 
 import { BAD_REQUEST, NOT_FOUND, OK, SERVICE_UNAVAILABLE, UNAUTHORIZED } from "./constants/statusCodes.js";
 import { Sequelize } from "sequelize";
-import appConfig from "../apps/auth-service/app.config.js";
-import { redisConfig } from "../apps/auth-service/redis.config.js";
+
 import { mailSender } from "./functions/mailSender.js";
 import { passportAuthInitializer } from "./config/passportAuthInitializer.js";
 import { logger } from "./utils/logger.js";
@@ -33,9 +32,27 @@ import { expressMiddleware } from "./middlewares/index.js";
 import { authenticateEncryptedToken } from "./utils/index.js";
 import Router from "@koa/router";
 import { RouterExtendedDefaultContext } from "./middlewares/router.js";
+import { config as PlatformConfig } from "./platform.config.js";
 
 const envs = process.env;
+const __dirname = nodePath.dirname(nodeUrl.fileURLToPath(import.meta.url));
+const resolve = (p: string) => nodePath.resolve(__dirname, p);
 const projectRoot = process.cwd();
+
+// Let import the app/platform configurations
+const platformConfig = nodePath.resolve(nodePath.join(__dirname, "platform.config.js"));
+const serviceConfig = [
+	nodePath.resolve(nodePath.join(projectRoot, "app.config.js")),
+	nodePath.resolve(nodePath.join(projectRoot, "dist", "app.config.js")),
+];
+
+const platformConfigSetting = (await import(platformConfig))?.["default"];
+const serviceConfigSetting = (await import(serviceConfig[1]))?.["default"] || (await import(serviceConfig[0]))?.["default"];
+
+const appConfig = (serviceConfig ? { ...platformConfigSetting, ...serviceConfigSetting } : platformConfigSetting) as typeof PlatformConfig;
+
+// console.log("appConfig", appConfig);
+
 const dynamicallyServeFilesInDirectory = appConfig?.files?.["dynamicallyServeFilesInDirectory"] as string | string[] | string[][];
 const filesDirectory =
 	dynamicallyServeFilesInDirectory && dynamicallyServeFilesInDirectory.length
@@ -60,65 +77,6 @@ const filesDirectory =
 // app auth init
 (async () => await passportAuthInitializer(passport))();
 
-/* Redis logic for initialization */
-const redisConnect = redisConfig();
-const isRedis = async (): Promise<Redis | null> =>
-	await new Promise((resolve, reject) => {
-		logger.info("Redis server info: " + JSON.stringify(redisConnect));
-		if (redisConnect) {
-			if (typeof redisConnect === "string") return reject(new Error(redisConnect));
-			let two000Count = 0; // retry tracker - shut down redis if this persistently fails to connect at start up
-			const redis = new Redis({
-				...redisConnect,
-				retryStrategy(times) {
-					const delay = Math.min(times * 50, 2000);
-					logger.info("Redis retry delay: " + delay);
-					if (delay === 2000) two000Count++;
-					// return two000Count > 3 || envs.NODE_ENV !== "production" ? null : delay;
-					return delay;
-				},
-				// lazyConnect: true,
-			})
-				.on("error", (err) => {
-					logger.error("Redis client init Error: ", err);
-					const quitCheck = two000Count > 3 || envs.NODE_ENV !== "production";
-					if (quitCheck) {
-						logger.warn("Unable to initiate a successful connect to a redis server and has been halted!");
-						// send admin email for follow-up
-						mailSender({
-							ignoreDevReceiverRewriteToSender: true,
-							// serverConfig: serverConfig,
-							receiver: [envs.MAIL_SERVER_SUPPORT_AUTH_MAIL || "", envs.MAIL_SERVER_AUTH_MAIL || "", "akin@mellywood.com"],
-							// sender: defaultSupportEmail,
-							subject: "Redis server issues",
-							content: `Unable to connect Redis server and ${appConfig.sitename} might be having production issues at the moment!!`,
-							log: true,
-						});
-						redis.quit();
-						resolve(null);
-					} else logger.info("Attempting redis re-connection...");
-					//console.log("err['code']", err["code"], "= ECONNREFUSED");
-				})
-				.on("reconnecting", () => {
-					logger.info("Redis client reconnecting...");
-				})
-				.on("ready", () => {
-					logger.info("Redis client connected... 😊");
-					console.log("Redis client connected... 😊");
-					two000Count = 0; // reset retry tracker
-					resolve(redis);
-				});
-			return redis;
-		}
-		logger.warn(
-			"No Redis server configured! Starting up platform without any optimised caching system, and simply using in-memory caching",
-		);
-		resolve(null);
-	});
-
-const __dirname = nodePath.dirname(nodeUrl.fileURLToPath(import.meta.url));
-const resolve = (p: string) => nodePath.resolve(__dirname, p);
-
 // Cache
 const cacheConfig = {
 	max: 3000,
@@ -133,7 +91,6 @@ const cacheConfig = {
 };
 const InMemoryCache = new LRUCache(appConfig.cache ? { ...cacheConfig, ...appConfig.cache } : cacheConfig);
 export { InMemoryCache };
-export const redis = await isRedis();
 
 // The App
 interface extendedKoaDefaultContext extends Koa.DefaultContext {
@@ -158,11 +115,13 @@ export const appInstance = app; // the current context of the app, which is used
 // init
 const init = async ({
 	cronJobs,
+	redis,
 	appRoutes,
 	cors,
 	sessionConfig,
-	env = process.env.NODE_ENV,
+	env = envs.NODE_ENV,
 }: {
+	redis?: Redis;
 	cronJobs?: () => Promise<void>;
 	appRoutes: Router<DefaultState, RouterExtendedDefaultContext>;
 	cors?: { origin: (string | { host: string; csp: string })[]; allowedMethods?: string; exposeHeaders?: string; allowHeaaders?: "" };
@@ -185,8 +144,8 @@ const init = async ({
 	if (cronJobs) cronJobs();
 
 	// imported env variables
-	const PORT = process.env.PORT;
-	const localUrl = env === "development" ? (process.env.localUrl ? process.env.localUrl : "http://localhost") : undefined;
+	const PORT = envs.PORT;
+	const localUrl = env === "development" ? (envs.localUrl ? envs.localUrl : "http://localhost") : undefined;
 
 	// cors Options
 	const appCors: Options = { origin: undefined };
@@ -245,7 +204,7 @@ const init = async ({
 				else if (typeof origin === "object" && origin.host) stringifyPossibleObjectOrigin.push(origin.host);
 			});
 			// where ctx.get("origin") is undefined as would be on request made from self hosted frontend, set origin to site address
-			const requestOrigin = ctx.get("origin") ? ctx.get("origin") : appConfig.sitename;
+			const requestOrigin = ctx.get("origin") ? ctx.get("origin") : appConfig.serverAddress;
 			if (requestOrigin && stringifyPossibleObjectOrigin.indexOf(requestOrigin) !== -1) {
 				return requestOrigin;
 			}
@@ -256,26 +215,26 @@ const init = async ({
 
 	// Quickly run & test an email server setup test if ignoreMailServer' is not set on config
 	if (!appConfig.ignoreMailServer) {
-		let sitename = appConfig.sitename;
+		let sitename = appConfig.projectName;
 		// sanitize website address
 		if (sitename) {
 			sitename = sitename.includes("//") ? sitename.split("//")[1] : sitename;
 			sitename = sitename.includes("www") ? sitename.split("www.")[1] : sitename;
 			await mailSender({
 				testServer: true,
-				sender: process.env.MAIL_SERVER_AUTH_MAIL
-					? process.env.MAIL_SERVER_AUTH_MAIL.includes("@")
-						? process.env.MAIL_SERVER_AUTH_MAIL.split("@")[0] + "@" + sitename
-						: process.env.MAIL_SERVER_AUTH_MAIL + "@" + sitename
+				sender: envs.MAIL_SERVER_AUTH_MAIL
+					? envs.MAIL_SERVER_AUTH_MAIL.includes("@")
+						? envs.MAIL_SERVER_AUTH_MAIL.split("@")[0] + "@" + sitename
+						: envs.MAIL_SERVER_AUTH_MAIL + "@" + sitename
 					: undefined,
 			});
 		}
 	}
 
 	// session
-	app.keys = process.env.COOKIE_KEYS ? JSON.parse(process.env.COOKIE_KEYS) : null;
+	app.keys = envs.COOKIE_KEYS ? JSON.parse(envs.COOKIE_KEYS) : null;
 	let appSessionConfig = {
-		key: process.env.COOKIE_IDENTIFIER,
+		key: envs.COOKIE_IDENTIFIER,
 		maxAge: 7 * 24 * 60 * 60 * 1000, // 3days
 		autoCommit: true,
 		overwrite: true,
@@ -294,8 +253,8 @@ const init = async ({
 		appSessionConfig = { ...appSessionConfig, ...sessionConfig } as typeof appSessionConfig;
 	}
 	// ensure site address exist in cookie
-	if (!appSessionConfig["domain" as keyof typeof appSessionConfig] && appConfig.sitename)
-		appSessionConfig["domain" as "key"] = appConfig.sitename.includes("://") ? appConfig.sitename.split("://")[1] : appConfig.sitename;
+	// if (!appSessionConfig["domain" as keyof typeof appSessionConfig] && appConfig.sitename)
+	// 	appSessionConfig["domain" as "key"] = appConfig.sitename.includes("://") ? appConfig.sitename.split("://")[1] : appConfig.sitename;
 	//console.log('appSessionConfig ', appSessionConfig)
 
 	// Create and refresh nonce for external scripts
@@ -349,7 +308,7 @@ const init = async ({
 							origin.host.length &&
 							(ctx.get("origin") === origin.host ||
 								// where ctx.get("origin") might be empty on request made directly from the server
-								(!ctx.get("origin") && appConfig.sitename === origin.host))
+								(!ctx.get("origin") && appConfig.serverAddress === origin.host))
 						)
 							if (origin.csp !== true) {
 								// Ignore if CSP is true and use default App CSP settings
@@ -382,7 +341,7 @@ const init = async ({
 						origin.length &&
 						(ctx.get("origin") === (origin as string) ||
 							// where ctx.get("origin") might be empty on request made directly from frontend hosted on server itself
-							(!ctx.get("origin") && appConfig.sitename === origin))
+							(!ctx.get("origin") && appConfig.serverAddress === origin))
 					) {
 						let output = "'self'";
 						if (nonce) output = `${nonce} ${output}`;
@@ -487,7 +446,7 @@ const init = async ({
 		.use(passport.session())
 		.use(async (ctx, next) => {
 			// process authentication where session isn't available
-			if (appConfig.appMode !== "serverless" && ctx.isUnauthenticated()) await authenticateEncryptedToken(ctx);
+			if (ctx.isUnauthenticated()) await authenticateEncryptedToken(ctx);
 
 			await next();
 		})
@@ -551,7 +510,7 @@ const init = async ({
 	});
 
 	app.use(async (ctx, next) => {
-		console.log("app path: ", ctx.path);
+		console.log(`${ctx.method} Request: `, ctx.path);
 		//console.log("ctx.url", ctx.url);
 		await next();
 	});
@@ -651,10 +610,7 @@ const init = async ({
 		ctx.status = 202;
 		ctx.type = ".html";
 		// end request
-		return (ctx.body =
-			appConfig.appMode !== "apiOnly"
-				? "Endpoint is not found"
-				: `
+		return (ctx.body = `
           <!DOCTYPE html>
           <html lang="en">
             <head>
@@ -694,7 +650,7 @@ const init = async ({
 
 	//import websocket status setting
 	function WebSocket() {
-		const envSetting = process.env.SOCKET_IO || process.env.SOCKET || process.env.WEBSOCKET;
+		const envSetting = envs.SOCKET_IO || envs.SOCKET || envs.WEBSOCKET;
 		const caseInsensitive = envSetting && envSetting.toLowerCase();
 		if (caseInsensitive)
 			try {
@@ -720,7 +676,7 @@ const init = async ({
 				cors: {
 					origin: corOrigins.length
 						? corOrigins.map((origin) => (typeof origin === "object" ? origin.host : origin))
-						: [appConfig.sitename || ""],
+						: [appConfig.serverAddress || ""],
 					// credentials: true,
 					methods: appConfig.methods?.map((meth) => meth.toUpperCase()),
 					// allowedHeaders: ["Content-Type", "Authorization"],
@@ -734,7 +690,92 @@ const init = async ({
 			app.context.io = io;
 			io.on("connection", (socket: Socket) => {
 				// console.log("socket.handshake: ", socket.handshake);
-				if (appConfig.appMode !== "serverless") {
+				if (app.context.tenantMode) {
+					socket.handshake.auth["sequelizeInstance"] = app.context.sequelizeInstance;
+					socket.handshake.auth["tenantMode"] = app.context.tenantMode;
+				} else if (app.context.sequelizeInstances) {
+					// tenantMode can be set in either authorization API prefix or a subdomain in inbound requests
+					if (appConfig.apiMultiTenancyMode === true || (appConfig.apiMultiTenancyMode as string[])) {
+						// true will default to values: live && test
+						const authorization = socket.handshake.auth.token || socket.handshake.auth.authorization;
+						const authorizationPrefix = authorization?.includes("_") && authorization.split("_")[0];
+
+						socket.handshake.auth["tenantMode"] =
+							authorizationPrefix && app.context.sequelizeInstances[authorizationPrefix] && authorizationPrefix;
+						// where tenant extraction is not possible on authorization prefix, try the url subdomain
+						if (!socket.handshake.auth["tenantMode"]) {
+							const url = socket.handshake.headers["host"];
+							if (url && url.includes(".")) {
+								const domainArraySplit = (url.includes("://") ? url.split("://")[0] : url).split(".");
+								const subdomains = domainArraySplit.filter(
+									(str, i) => i + 1 !== domainArraySplit.length && 1 !== domainArraySplit.length - 1,
+								);
+								socket.handshake.auth["tenantMode"] = subdomains.length && app.context.sequelizeInstances[subdomains[0]] && subdomains[0];
+							}
+						}
+						if (socket.handshake.auth["tenantMode"])
+							socket.handshake.auth["sequelizeInstance"] = app.context.sequelizeInstances[socket.handshake.auth["tenantMode"]];
+						else if (app.context.sequelizeInstances["test"]) {
+							socket.handshake.auth["tenantMode"] = "test";
+							socket.handshake.auth["sequelizeInstance"] = app.context.sequelizeInstances["test"];
+						} else socket.handshake.auth["tenantMode"] = undefined;
+					}
+				}
+
+				app.context.ioSocket = socket;
+			});
+
+			// console.log('socketEvents', socketEvents)
+			// console.log('ioEvents', ioEvents)
+			socketStart = true;
+		}
+		const thisServerPort = !isNaN(Number(PORT)) ? PORT : 5173;
+		server1.listen(thisServerPort, () => {
+			console.info(env?.toUpperCase() + " server environment!!");
+			console.info(
+				"Server started on: " +
+					thisServerPort +
+					(Object.keys(sequelizeInstances).length > 1
+						? `, in multiple tenancy mode on ${Object.keys(sequelizeInstances)
+								.map((env, i) => env + (i + 1 < Object.keys(sequelizeInstances).length ? ", " : ""))
+								.join()}`
+						: Object.keys(sequelizeInstances).length
+							? " as single tenancy LIVE mode"
+							: " without API tenancy") +
+					" | " +
+					new Date(Date.now()),
+			);
+			if (socketStart) console.log("Websocket started with Server");
+		});
+	}
+
+	//INIT SSL SERVER
+	if (envs.SSL_ENABLE && envs.SSL_ENABLE.toLowerCase() === "true") {
+		const key = envs.SSL_KEY;
+		const cert = envs.SSL_CERTIFICATE;
+
+		const sslConfig = {
+			key: key ? fs.readFileSync(key, "utf8").toString() : "",
+			cert: cert ? fs.readFileSync(cert, "utf8").toString() : "",
+		};
+		if (sslConfig.key && sslConfig.cert) {
+			const server2 = https.createServer(sslConfig, app.callback());
+			//turn on websocket if its enable in process env variable on SSL
+			let socketStart: boolean;
+			if (webSocket && webSocket.includes("https")) {
+				const io = new Server(server2, {
+					cors: {
+						origin: corOrigins.length
+							? corOrigins.map((origin) => (typeof origin === "object" ? origin.host : origin))
+							: [appConfig.serverAddress || ""],
+						// credentials: true,
+						methods: appConfig.methods?.map((meth) => meth.toUpperCase()),
+						optionsSuccessStatus: 200,
+					},
+				});
+				//expose socket.io to ctx process
+				app.context.io = io;
+				io.on("connection", (socket: Socket) => {
 					if (app.context.tenantMode) {
 						socket.handshake.auth["sequelizeInstance"] = app.context.sequelizeInstance;
 						socket.handshake.auth["tenantMode"] = app.context.tenantMode;
@@ -766,100 +807,12 @@ const init = async ({
 							} else socket.handshake.auth["tenantMode"] = undefined;
 						}
 					}
-				}
-				app.context.ioSocket = socket;
-			});
 
-			// console.log('socketEvents', socketEvents)
-			// console.log('ioEvents', ioEvents)
-			socketStart = true;
-		}
-		const thisServerPort = !isNaN(Number(PORT)) ? PORT : 5173;
-		server1.listen(thisServerPort, () => {
-			console.info(env?.toUpperCase() + " server environment!!");
-			console.info(
-				"Server started on: " +
-					thisServerPort +
-					(Object.keys(sequelizeInstances).length > 1
-						? `, in multiple tenancy mode on ${Object.keys(sequelizeInstances)
-								.map((env, i) => env + (i + 1 < Object.keys(sequelizeInstances).length ? ", " : ""))
-								.join()}`
-						: Object.keys(sequelizeInstances).length
-							? " as single tenancy LIVE mode"
-							: " without API tenancy") +
-					" | " +
-					new Date(Date.now()),
-			);
-			if (socketStart) console.log("Websocket started with Server");
-		});
-	}
-
-	//INIT SSL SERVER
-	if (process.env.SSL_ENABLE && process.env.SSL_ENABLE.toLowerCase() === "true") {
-		const key = process.env.SSL_KEY;
-		const cert = process.env.SSL_CERTIFICATE;
-
-		const sslConfig = {
-			key: key ? fs.readFileSync(key, "utf8").toString() : "",
-			cert: cert ? fs.readFileSync(cert, "utf8").toString() : "",
-		};
-		if (sslConfig.key && sslConfig.cert) {
-			const server2 = https.createServer(sslConfig, app.callback());
-			//turn on websocket if its enable in process env variable on SSL
-			let socketStart: boolean;
-			if (webSocket && webSocket.includes("https")) {
-				const io = new Server(server2, {
-					cors: {
-						origin: corOrigins.length
-							? corOrigins.map((origin) => (typeof origin === "object" ? origin.host : origin))
-							: [appConfig.sitename || ""],
-						// credentials: true,
-						methods: appConfig.methods?.map((meth) => meth.toUpperCase()),
-						optionsSuccessStatus: 200,
-					},
-				});
-				//expose socket.io to ctx process
-				app.context.io = io;
-				io.on("connection", (socket: Socket) => {
-					if (appConfig.appMode !== "serverless") {
-						if (app.context.tenantMode) {
-							socket.handshake.auth["sequelizeInstance"] = app.context.sequelizeInstance;
-							socket.handshake.auth["tenantMode"] = app.context.tenantMode;
-						} else if (app.context.sequelizeInstances) {
-							// tenantMode can be set in either authorization API prefix or a subdomain in inbound requests
-							if (appConfig.apiMultiTenancyMode === true || (appConfig.apiMultiTenancyMode as string[])) {
-								// true will default to values: live && test
-								const authorization = socket.handshake.auth.token || socket.handshake.auth.authorization;
-								const authorizationPrefix = authorization?.includes("_") && authorization.split("_")[0];
-
-								socket.handshake.auth["tenantMode"] =
-									authorizationPrefix && app.context.sequelizeInstances[authorizationPrefix] && authorizationPrefix;
-								// where tenant extraction is not possible on authorization prefix, try the url subdomain
-								if (!socket.handshake.auth["tenantMode"]) {
-									const url = socket.handshake.headers["host"];
-									if (url && url.includes(".")) {
-										const domainArraySplit = (url.includes("://") ? url.split("://")[0] : url).split(".");
-										const subdomains = domainArraySplit.filter(
-											(str, i) => i + 1 !== domainArraySplit.length && 1 !== domainArraySplit.length - 1,
-										);
-										socket.handshake.auth["tenantMode"] =
-											subdomains.length && app.context.sequelizeInstances[subdomains[0]] && subdomains[0];
-									}
-								}
-								if (socket.handshake.auth["tenantMode"])
-									socket.handshake.auth["sequelizeInstance"] = app.context.sequelizeInstances[socket.handshake.auth["tenantMode"]];
-								else if (app.context.sequelizeInstances["test"]) {
-									socket.handshake.auth["tenantMode"] = "test";
-									socket.handshake.auth["sequelizeInstance"] = app.context.sequelizeInstances["test"];
-								} else socket.handshake.auth["tenantMode"] = undefined;
-							}
-						}
-					}
 					app.context.ioSocket = socket;
 				});
 				socketStart = true;
 			}
-			const thisServerPort = !isNaN(Number(process.env.SSL_PORT)) ? process.env.SSL_PORT : 5174;
+			const thisServerPort = !isNaN(Number(envs.SSL_PORT)) ? envs.SSL_PORT : 5174;
 			server2.listen(thisServerPort, () => {
 				console.info("Server (SSL) started on: " + thisServerPort + " | " + new Date(Date.now()));
 				if (socketStart) console.log("Websocket started with Server (SSL)");

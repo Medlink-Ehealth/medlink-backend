@@ -1,31 +1,41 @@
-
-import validator from "validator";
-import { authenticateEncryptedToken, hashPassword, mailSender, otpLinkGenerator, otpLinkVerifier, requestParser, Router, signAccountInLocal, signAccountInWithThirdParty, signAccountInWithThirdPartyValidateAs, signAccountInWithThirdPartyVerifier, statusCodes } from "../../../_/index.js";
+import {
+	JsonObject,
+	Router,
+	authenticateEncryptedToken,
+	hashPassword,
+	logger,
+	mailSender,
+	newUserAccountCreationTemplate,
+	notificationLogger,
+	otpLinkGenerator,
+	otpLinkVerifier,
+	requestParser,
+	statusCodes,
+} from "@medlink/common";
 import { adminFormValidator } from "../../../validators/adminFormValidator.js";
-import { AdminUser } from "../../../@types/Models.js";
+import { AdminUser } from "../../../@types/index.js";
 import { UserSetting } from "../../../models/accounts/UserSetting.model.js";
-import { notificationLogger } from "../../../functions/notificationLogger.js";
-import { messagingSender } from "../../../functions/messagingSender.js";
-import config from "../../../../app.config.js";
-import { JsonObject } from "../../../@types/utils.js";
+import { adminController } from "../../../controllers/admin.addon.userController.js";
 import { Admin } from "../../../models/accounts/Admin.model.js";
-import { logger } from "../../../_/utils/logger.js";
-import { newUserAccountCreationTemplate } from "../../../functions/mailTemplates/newUserAccountCreationTemplate.js";
-import { adminController } from "../../../controllers/users/admin.addon.userController.js";
+import validator from "validator";
+import {
+	signAccountInLocal,
+	signAccountInWithThirdParty,
+	signAccountInWithThirdPartyValidateAs,
+	signAccountInWithThirdPartyVerifier,
+} from "../../../controllers/account.controller.js";
 
 const router = Router("admin");
 
 /**
  * Direct Sign in process without 2FA option
  * @openapi
- * /v1/admin/sign-in:
+ * /admin/login:
  *   post:
  *     tags:
- *       - Admin public routes
+ *       - Admin Users
  *     summary: Sign in an admin account
  *     description: Make a post request with the admin credential to server to sign in
- *     parameters:
- *       - $ref: '#/components/parameters/appID'
  *     requestBody:
  *       description: Request body can be available as json formated or FormData
  *       required: true
@@ -133,14 +143,12 @@ const router = Router("admin");
 /**
  * 2FA specific sign-in
  * @openapi
- * /v1/admin/sign-in/2fa:
+ * /admin/login/2fa:
  *   post:
  *     tags:
- *       - Admin public routes
+ *       - Admin Users
  *     summary: "Account that has 'secured' enabled will require 2FA"
  *     description: An account can optionally opt to enable 2FA. When this is the case, the '/sign-in' endpoint would instead return a token with a redirect status. Send the token as payload with the 2FA code from authenticator to this endpoint to process sign-in for 2fa enabled account
- *     parameters:
- *       - $ref: '#/components/parameters/appID'
  *     requestBody:
  *       description: Request body can be available as json formated or FormData
  *       required: true
@@ -234,7 +242,7 @@ const router = Router("admin");
  */
 
 router.post(
-	["/sign-in", "/sign-in/2fa"],
+	["/login", "/login/2fa"],
 	requestParser({ multipart: true }),
 	async (ctx, next) => {
 		//console.log('ctx.path', ctx.path)
@@ -317,17 +325,6 @@ router.post(
 							}),
 						},
 					});
-				if (user.phoneNumber)
-					try {
-						messagingSender({
-							message: `Here is the code ${OTPvalue} to verify your account on ${config.sitename}.`,
-							receiver: user.phoneNumber,
-						});
-					} catch (err) {
-						ctx.status = (err as object)["code" as keyof typeof err];
-						ctx.message = (err as object)["message" as keyof typeof err];
-						return;
-					}
 			}
 			//ctx.body = undefined; //remove data
 			ctx.body = {
@@ -352,14 +349,12 @@ router.post(
 /**
  * Reset Admin passowrd
  * @openapi
- * /v1/admin/reset-password:
+ * /admin/reset-password:
  *   post:
  *     tags:
- *       - Admin public routes
+ *       - Admin Users
  *     summary: Reset an admin user password
  *     description: Make a post request with the admin email to server to invoke reset
- *     parameters:
- *       - $ref: '#/components/parameters/appID'
  *     requestBody:
  *       description: Request body can be available as json formated or FormData
  *       required: true
@@ -397,7 +392,7 @@ router.post(
  */
 
 router.post(
-	"/reset-password",
+	"/admin/reset-password",
 	authenticateEncryptedToken,
 	requestParser(),
 	async (ctx, next) => {
@@ -408,11 +403,6 @@ router.post(
 			return;
 		}
 		ctx.state.userType = "Admin";
-
-		// //remove this below lines once email feature has been implemented
-		// ctx.status = statusCodes.SERVICE_UNAVAILABLE;
-		// ctx.statusText = "The service is currently not available";
-		// return;
 		await next();
 	},
 	adminFormValidator.resetPassword,
@@ -425,14 +415,13 @@ router.post(
 /**
  * validate Admin passowrd reset
  * @openapi
- * /v1/admin/set-new-password:
+ * /admin/set-new-password:
  *   post:
  *     tags:
- *       - Admin public routes
+ *       - Admin Users
  *     summary: Confirm admin user password reset
  *     description: Call endpoint to complete password reset process by providing new password
  *     parameters:
- *       - $ref: '#/components/parameters/appID'
  *       - in: query
  *         name: id
  *         schema:

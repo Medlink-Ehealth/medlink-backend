@@ -3,7 +3,7 @@ import process from "node:process";
 import fs from "node:fs";
 import { NOT_ACCEPTABLE } from "../constants/statusCodes.js";
 import { KoaBodyMiddlewareOptions } from "koa-body";
-import config from "../../platform.config.js";
+import { config } from "../platform.config.js";
 
 //type defines the kind/type of media
 //type options: image/video
@@ -59,7 +59,7 @@ const media = (type?: "image" | "video" | ("image" | "video")[]): Partial<KoaBod
 					ext = "." + (mimeType.includes("/") ? mimeType.split("/")[1] : mimeType);
 				}
 				return (
-					(config.sitename ? config.sitename.split(" ").join("") : "media") +
+					(config.serverAddress ? config.serverAddress.split(" ").join("") : "media") +
 					"-" +
 					form.name.replace(/[^a-zA-Z0-9 ]/g, "-") +
 					"-" +
