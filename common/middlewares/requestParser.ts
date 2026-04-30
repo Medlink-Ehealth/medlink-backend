@@ -140,7 +140,7 @@ export const requestParser = (options?: Options) =>
 					return data;
 				};
 				if (Array.isArray(ctx.request.body))
-					ctx.request.body = ctx.request.body.map((bod) =>
+					ctx.request.body = (ctx.request.body as { [x: string]: string | number | boolean | null | undefined }[]).map((bod) =>
 						processRequestDataTypeof(bod as { [x: string]: string | number | boolean | null | undefined }),
 					) as unknown as undefined;
 				else

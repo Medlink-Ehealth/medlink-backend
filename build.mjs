@@ -10,9 +10,9 @@ if (!service) {
 await esbuild
 	.build({
 		// Point to the entry file inside your app folder
-		entryPoints: [`apps/${service}/src/index.ts`],
+		entryPoints: [`apps/${service}/index.ts`],
 		bundle: true,
-		minify: true,
+		minify: false,
 		sourcemap: true,
 		platform: "node",
 		target: "node20",

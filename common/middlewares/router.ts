@@ -1,7 +1,8 @@
 import router from "@koa/router";
 import { DefaultContext, DefaultState } from "koa";
 import { Sequelize } from "sequelize";
-import config from "../../platform.config.js";
+import { config } from "../platform.config.js";
+import { Socket, Server } from "socket.io";
 
 type JsonValue = string | number | boolean | null | undefined | JsonObject | JsonArray;
 type JsonObject = {
@@ -10,12 +11,22 @@ type JsonObject = {
 type JsonArray = Array<JsonValue>;
 
 export interface RouterExtendedDefaultContext extends DefaultContext {
-	request?: {
+	request: DefaultContext["request"] & {
 		body?: JsonValue;
 		files?: [string, File]; // [formidable.Fields<string>, formidable.Files<string>]
 		rawBody?: unknown;
 	};
 	sequelizeInstance?: Sequelize;
+	tenantMode?: string;
+	ioSocket?: Socket & {
+		handshake: Socket["handshake"] & {
+			auth: Socket["handshake"]["auth"] & { sequelizeInstance?: Sequelize; tenantMode?: string };
+		};
+	};
+	state: DefaultContext["request"]["state"] & {
+		error: { code: number; message: string };
+	};
+	io?: Server;
 }
 type routerProps = { prefix?: string; host?: string; subdomain?: string };
 
@@ -24,7 +35,7 @@ type routerProps = { prefix?: string; host?: string; subdomain?: string };
 
    Host and subdomain doesn't work except when declared at the app root and not inside a route ancessor that has already been called.
 */
-const Router = (opts?: string | routerProps, host?: string, subdomain?: string) => {
+const Router = (opts?: string | routerProps, host?: string, subdomain?: string): router<DefaultState, RouterExtendedDefaultContext> => {
 	let koaRouterPrefix;
 	let koaRouterHost;
 	let koaRouterSubdomain;
@@ -36,42 +47,43 @@ const Router = (opts?: string | routerProps, host?: string, subdomain?: string) 
 		if (typeof opts.subdomain === "string") koaRouterSubdomain = opts.subdomain;
 	}
 
-	let routerProps:
+	let routerPropsObj:
 		| {
 				[prefixOrHost: string]: string | RegExp;
 		  }
 		| undefined;
 
 	if (koaRouterPrefix)
-		routerProps = {
+		routerPropsObj = {
 			prefix: !koaRouterPrefix.startsWith("/") ? `/${koaRouterPrefix}` : koaRouterPrefix,
 		};
 	else if (typeof opts === "string")
-		routerProps = {
+		routerPropsObj = {
 			prefix: !opts.startsWith("/") ? `/${opts}` : opts,
 		};
 
 	if (koaRouterHost)
-		routerProps = routerProps
-			? { ...routerProps, host: koaRouterHost }
+		routerPropsObj = routerPropsObj
+			? { ...routerPropsObj, host: koaRouterHost }
 			: {
 					host: koaRouterHost,
 				};
 	else if (typeof host === "string")
-		routerProps = routerProps
-			? { ...routerProps, host: host }
+		routerPropsObj = routerPropsObj
+			? { ...routerPropsObj, host: host }
 			: {
 					host: host,
 				};
 
 	if ((subdomain && typeof subdomain === "string") || koaRouterSubdomain) {
 		const thisSubdomain = subdomain || koaRouterSubdomain;
-		if (routerProps && routerProps.host) {
-			if ((routerProps.host as string).startsWith("www")) routerProps.host = (routerProps.host as string).split("www").join(thisSubdomain);
+		if (routerPropsObj && routerPropsObj.host) {
+			if ((routerPropsObj.host as string).startsWith("www"))
+				routerPropsObj.host = (routerPropsObj.host as string).split("www").join(thisSubdomain);
 			else
-				routerProps.host = (routerProps.host as string).includes("://")
-					? (routerProps.host as string).split("://").join("://" + thisSubdomain + ".")
-					: thisSubdomain + "." + routerProps.host;
+				routerPropsObj.host = (routerPropsObj.host as string).includes("://")
+					? (routerPropsObj.host as string).split("://").join("://" + thisSubdomain + ".")
+					: thisSubdomain + "." + routerPropsObj.host;
 		} else {
 			let serverHost =
 				config.serverAddress && config.serverAddress.includes("://") ? config.serverAddress.split("://")[1] : config.serverAddress;
@@ -86,15 +98,17 @@ const Router = (opts?: string | routerProps, host?: string, subdomain?: string) 
 			} else subdomainWithHost = new RegExp("^" + thisSubdomain + "\\." + serverHost + "$"); //thisSubdomain + "." + serverHost;
 
 			//console.log("subdomainWithHost", subdomainWithHost);
-			routerProps = routerProps
-				? { ...routerProps, host: subdomainWithHost }
+			routerPropsObj = routerPropsObj
+				? { ...routerPropsObj, host: subdomainWithHost }
 				: {
 						host: subdomainWithHost,
 					};
 		}
 	}
-	//console.log(routerProps);
-	return new router<DefaultState, RouterExtendedDefaultContext>(routerProps);
+
+	//console.log(routerPropsObj);
+	return new router<DefaultState, RouterExtendedDefaultContext>(routerPropsObj) as router<DefaultState, RouterExtendedDefaultContext>;
+	// return new router(routerPropsObj);
 };
 
 export { Router };

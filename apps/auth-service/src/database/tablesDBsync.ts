@@ -1,12 +1,10 @@
-import { sequelizeInstances, getOffsetTimestamp, logger } from "@medlink/common";
-import { Notification } from "../../../../common/models/Notification.model.js";
-import { OTP } from "../../../../common/models/OTP.model.js";
-import { UserAccessTimestamp } from "../../../../common/models/UserAccessTimestamp.model.js";
-import { UserSecurity } from "../../../../common/models/UserSecurity.model.js";
+import { sequelizeInstances, getOffsetTimestamp, logger, Notification, UserAccessTimestamp, UserSecurity, OTP } from "@medlink/common";
 
 import { Admin } from "../models/accounts/Admin.model.js";
 import { Sequelize } from "sequelize";
 import { AdminRole } from "../models/accounts/AdminRole.model.js";
+import { UserSetting } from "../models/accounts/UserSetting.model.js";
+import { Client } from "../models/accounts/Client.model.js";
 
 const instances = Object.values(sequelizeInstances);
 
@@ -14,7 +12,7 @@ const instances = Object.values(sequelizeInstances);
 const roles = [
 	{ level: 0, label: "Inactive" },
 	{ level: 1, label: "Active" },
-	{ level: 2, label: "Editor" },
+	{ level: 2, label: "Support" },
 	{ level: 3, label: "Admin" },
 	{ level: 4, label: "Manager" },
 	{ level: 999, label: "Dev" },
@@ -31,6 +29,13 @@ const dummyOTP = {
 const modelsSync = async (sequelize: Sequelize) => {
 	// if dev mode.
 	try {
+		await UserSetting(sequelize).sync({ alter: true });
+		await UserAccessTimestamp(sequelize).sync({ alter: true });
+		await UserSecurity(sequelize).sync({ alter: true });
+
+		await Admin(sequelize).sync({ alter: true });
+		await Client(sequelize).sync({ alter: true });
+
 		await AdminRole(sequelize).sync({ force: true });
 		await OTP(sequelize).sync({ alter: true });
 		await Notification(sequelize).sync({ force: true });
@@ -38,11 +43,6 @@ const modelsSync = async (sequelize: Sequelize) => {
 		await sequelize.transaction(async (t) => {
 			await AdminRole(sequelize).bulkCreate(roles, { transaction: t });
 		});
-
-		await Admin(sequelize).sync({ alter: true });
-
-		await UserAccessTimestamp(sequelize).sync({ alter: true });
-		await UserSecurity(sequelize).sync({ alter: true });
 
 		logger.info("All tables synced as needed!");
 	} catch (err) {
@@ -58,3 +58,16 @@ for (const sequelize of instances) {
 	await modelsSync(sequelize);
 }
 process.exit();
+
+
+/* 
+{
+  "email": "akin@mellywood.com",
+  "password": "Accounts2@",
+  "repeatedPassword": "Accounts2@",
+  "firstName": "Akin",
+  "lastName": "Akin",
+  "phoneNumber": "07086333388"
+}
+
+*/

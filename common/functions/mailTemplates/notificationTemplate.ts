@@ -3,7 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
-import config from "../../../platform.config.js";
+import { config } from "../../platform.config.js";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const resolve = (p: string) => path.resolve(__dirname, p);
 const root = process.cwd();
@@ -19,7 +19,7 @@ export const notificationTemplate = ({ header, body, footer }: { header: string;
 	readTemplate = readTemplate.replace(
 		"$${footer placeholder}$$",
 		`${footer ? footer + "<br><br>" : ""}
-                        Copyright &copy; ${new Date(Date.now()).getFullYear()} | ${config.sitename}`
+                        Copyright &copy; ${new Date(Date.now()).getFullYear()} | ${config.projectName}`
 	);
 
 	return readTemplate;

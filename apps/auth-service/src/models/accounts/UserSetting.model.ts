@@ -1,6 +1,6 @@
-
+import { sequelizeInstances } from "@medlink/common";
 import { DataTypes, Model, Sequelize } from "sequelize";
-import { sequelizeInstances } from "../../config/db.config.js";
+
 const instances = Object.values(sequelizeInstances);
 /**
  * User setting
@@ -15,10 +15,6 @@ const instances = Object.values(sequelizeInstances);
  *           type: string
  *           format: uuid
  *           readOnly: true
- *         businessApi:
- *           type: string
- *           enum: ["disabled", "enabled"]
- *           description: "Business can integrate with Riideon to process bulk orders, either as a client users that create the orders, or a delivery partners to makes the deliveries. This feature is being implemented in stages, starting with Client order creations. Hence review the Business API implementation endpoints for futher details."
  *         sendNotificationsBy:
  *           type: array
  *           description: notification options may include depending on implementations => email | sms | whatsapp. Only 'email' is available at the moment
@@ -32,7 +28,7 @@ const instances = Object.values(sequelizeInstances);
  *           uniqueItems: true
  *           items:
  *             type: string
- *             enum: [ "signingIn", "passwordChange", "newOrderComplete", "paymentConfirmation", "orderShipmentUpdates", "ticketUpdates" ]
+ *             enum: [ "signingIn", "passwordChange", "newOrderComplete", "paymentConfirmation"]
  */
 export const userSettingPlatformProps = {
 	sendNotificationsBy: { email: "Email" },
@@ -41,8 +37,8 @@ export const userSettingPlatformProps = {
 		passwordChange: "Password changes",
 		newOrderCompletion: "New order completions",
 		paymentConfirmation: "Payment confirmations",
-		orderShipmentUpdates: "Order shipments and updates",
-		ticketUpdates: "Support ticket updates",
+		// orderShipmentUpdates: "Order shipments and updates",
+		// ticketUpdates: "Support ticket updates",
 	},
 };
 
@@ -73,18 +69,13 @@ instances.map((sequelize) => {
 			},
 			user_type: {
 				//Specific user acccount type
-				type: DataTypes.ENUM("client", "admin", "delivery_partner"),
+				type: DataTypes.ENUM("client", "admin"),
 				allowNull: false,
-			},
-			businessApi: {
-				// available for bulk business implementation/integration
-				type: DataTypes.STRING,
-				defaultValue: "disabled",
-				allowNull: false,
-				values: ["disabled", "enabled"],
 			},
 			sendNotificationsBy: {
-				type: DataTypes.ARRAY(DataTypes.STRING),
+				/* 
+				Only postgres supports DataTypes.ARRAY, so we are conditionally checking for postgres, otherwise we use DataTypes.JSON for data type here */
+				type: sequelize.getDialect()?.toLowerCase() === "postgres" ? DataTypes.ARRAY(DataTypes.STRING) : DataTypes.JSON,
 				defaultValue: ["email"],
 				values: ["email"],
 				field: "send_notifications_by",
@@ -113,9 +104,9 @@ instances.map((sequelize) => {
 				},
 			},
 			notificationsToReceive: {
-				type: DataTypes.ARRAY(DataTypes.STRING),
-				defaultValue: ["signingIn", "passwordChange", "paymentConfirmation", "ticketUpdates"],
-				//values: ["signingIn", "passwordChange", "newOrderComplete", "paymentConfirmation", "orderShipmentUpdates", "ticketUpdates"],
+				type: sequelize.getDialect()?.toLowerCase() === "postgres" ? DataTypes.ARRAY(DataTypes.STRING) : DataTypes.JSON, // same as sendNotificationsBy above
+				defaultValue: ["signingIn", "passwordChange", "paymentConfirmation"],
+				//values: ["signingIn", "passwordChange", "newOrderComplete", "paymentConfirmation", "orderShipmentUpdates"],
 				field: "notifications_to_receive",
 				set(inValues) {
 					const possibleValues = Object.keys(userSettingPlatformProps["notificationsToReceive"]);
@@ -150,7 +141,7 @@ instances.map((sequelize) => {
 			},
 			tableName: "user_settings",
 			timestamps: false,
-			sequelize, // We need to pass the connection instance
+			sequelize: sequelize, // We need to pass the connection instance
 			modelName: "UserSetting", // We need to choose the model name
 		},
 	);

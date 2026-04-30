@@ -7,7 +7,7 @@ import { logger } from "../logger.js";
 import { BAD_REQUEST, SERVER_ERROR } from "../../constants/statusCodes.js";
 import passport from "koa-passport";
 import { statusCodes } from "../../constants/index.js";
-import config from "../../../platform.config.js";
+import { config } from "../../platform.config.js";
 //console.log(require('crypto').randomBytes(64).toString('hex'));
 
 const generateJwtToken = (data: string | object, options?: object) => {
@@ -19,7 +19,7 @@ const generateJwtToken = (data: string | object, options?: object) => {
 				result: data,
 			},
 			JWT_SECRET_KEY,
-			{ expiresIn: "7d", issuer: config.siteAddress, ...options },
+			{ expiresIn: "7d", issuer: config.serverAddress, ...options },
 		);
 	//else return null;
 };
@@ -81,8 +81,8 @@ const encryptionToken = async (data: string | object, options?: paseto.ProduceOp
 				key,
 				{
 					expiresIn: "7d", // 24 hours | 20 m | 60s
-					issuer: config.siteAddress,
-					audience: config.sitename + ":APP",
+					issuer: config.serverAddress,
+					audience: config.projectName + ":APP",
 					...options,
 				},
 			);
@@ -107,8 +107,8 @@ const decryptToken = async (token: string, options?: paseto.ProduceOptions, key 
 			// an optional "options" allows to add extra PASETO configuration options
 			//re-add 'v3.local. to key from paseto
 			const decoded = await V3.decrypt("v3.local." + token, key, {
-				audience: config.sitename + ":APP",
-				issuer: config.siteAddress,
+				audience: config.projectName + ":APP",
+				issuer: config.serverAddress,
 				clockTolerance: "1 min",
 				...options,
 			});

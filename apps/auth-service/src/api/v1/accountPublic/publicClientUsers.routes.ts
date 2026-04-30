@@ -1,34 +1,45 @@
-
+import {
+	JsonObject,
+	Router,
+	authenticateEncryptedToken,
+	checkAccount,
+	hashPassword,
+	logger,
+	mailSender,
+	newUserAccountCreationTemplate,
+	notificationLogger,
+	otpLinkGenerator,
+	otpLinkVerifier,
+	requestParser,
+	statusCodes,
+} from "@medlink/common";
 import validator from "validator";
 import { Op } from "sequelize";
-import { authenticateEncryptedToken, checkAccount, hashPassword, mailSender, otpLinkGenerator, otpLinkVerifier, requestParser, Router, signAccountInLocal, signAccountInWithThirdParty, signAccountInWithThirdPartyValidateAs, signAccountInWithThirdPartyVerifier, statusCodes } from "../../../_/index.js";
-import { userCombosFormValidator } from "../../../validators/userCombosFormValidator.js";
-import { NonAdminUsersController } from "../../../controllers/users/NonAdminUsers.addon.userController.js";
-import { JsonObject } from "../../../@types/utils.js";
-import { Client } from "../../../models/accounts/Client.model.js";
-import { logger } from "../../../_/utils/logger.js";
-import { messagingSender } from "../../../functions/messagingSender.js";
-import { newUserAccountCreationTemplate } from "../../../functions/mailTemplates/newUserAccountCreationTemplate.js";
-import { UserSetting } from "../../../models/accounts/UserSetting.model.js";
-import { notificationLogger } from "../../../functions/notificationLogger.js";
-import { ClientUser } from "../../../@types/Models.js";
-import config from "../../../../app.config.js";
 import { clientFormValidator } from "../../../validators/clientFormValidator.js";
-import { createNewAccount } from "../../../controllers/users/createNewAccount.controller.js";
+import config from "../../../../app.config.js";
+import { createNewAccount } from "../../../controllers/createNewAccount.controller.js";
+import { Client, UserSetting } from "../../../models/accounts/index.js";
+import { userCombosFormValidator } from "../../../validators/userCombosFormValidator.js";
+import { ClientUser } from "../../../@types/index.js";
+import { NonAdminUsersController } from "../../../controllers/NonAdminUsers.addon.userController.js";
+import {
+	signAccountInLocal,
+	signAccountInWithThirdParty,
+	signAccountInWithThirdPartyValidateAs,
+	signAccountInWithThirdPartyVerifier,
+} from "../../../controllers/account.controller.js";
 
 const router = Router();
 
 /**
- * New client user sign up route. Delievery Partners are not enabled to sign up here. It's exclusive to Client users
+ * New client user sign up route.
  * @openapi
- * /v1/client/sign-up:
+ * /register:
  *   post:
  *     tags:
- *       - Client public routes
- *     summary: Client user sign up endpoint.
+ *       - Client Users
+ *     summary: Client user register endpoint.
  *     description: "Endpoint only allows to create a Client new user account. If a client user tries to re-register within a 30 minutes period, a verification code is resent to the user, otherwise user is asked to sign in."
- *     parameters:
- *       - $ref: '#/components/parameters/appID'
  *     requestBody:
  *       description: Request body can be available as json formated or FormData
  *       required: true
@@ -130,7 +141,7 @@ const router = Router();
 
 // Create a client new account => User sign up
 router.post(
-	"/client/sign-up",
+	"/register",
 	requestParser({ multipart: true }),
 	async (ctx, next) => {
 		// export userType which is needed in both checkAccount && createNewAccount middleware
@@ -140,10 +151,15 @@ router.post(
 	clientFormValidator.createAccount,
 	checkAccount(false),
 	async (ctx, next) => {
-		//console.log("ctx.state.error", ctx.state.error);
+		// console.log("ctx.state.error", ctx.state.error);
+		// because of the way multitenancy is defined when instantiating db connetcivity, we need to check if sequelize instance existif
+		if (!ctx.sequelizeInstance) {
+			logger.error("No active sequelizeInstance detected, and unable to run DB related entries in publicClientUsers route");
+			return ctx.throw("Oops! Server error");
+		}
 		if (ctx.state.error) {
-			/* When account already exist but unverified, auto resend a verification link to user email and/or phone number.
-			It only makes sense to do this within a limited time, hence 30 minutes period is used here. */
+			/* When account already exist but unverified, auto resend a verification link to user email
+				-	It only makes sense to do this within a limited time, hence 30 minutes period is used here. */
 			if (ctx.state.error.code === statusCodes.CONFLICT) {
 				const bothEmailNnumber = ctx.request.body.email && ctx.request.body.phoneNumber;
 				const whereFilter = bothEmailNnumber
@@ -151,7 +167,7 @@ router.post(
 					: ctx.request.body.email
 						? { email: ctx.request.body.email }
 						: { phoneNumber: ctx.request.body.phoneNumber };
-				const checkVerified = await Client(ctx.sequelizeInstance!)
+				const checkVerified = await Client(ctx.sequelizeInstance)
 					.scope("management")
 					.findOne({
 						where: {
@@ -171,12 +187,11 @@ router.post(
 						entityReference: "Client",
 						typeOfOTPChar: "numbers",
 						numberOfOTPChar: 4,
-						queryIdentifier:
-							identifier === 2
-								? [checkVerified.dataValues.email, checkVerified.dataValues.phoneNumber]
-								: identifier === 1
-									? checkVerified.dataValues.email
-									: checkVerified.dataValues.phoneNumber,
+						queryIdentifier: (identifier === 2
+							? [checkVerified.dataValues.email, checkVerified.dataValues.phoneNumber]
+							: identifier === 1
+								? checkVerified.dataValues.email
+								: checkVerified.dataValues.phoneNumber) as string | string[],
 						log: `Client: Unverified new account`,
 						expiry: "15m",
 						//route: "/verify/newuser", //available at dir system/otp/newUserVerify.routes
@@ -205,23 +220,12 @@ router.post(
 										otp: OTPvalue,
 										greetings: "Welcome to the family",
 										name: checkVerified.dataValues.firstName,
-										body: `${config.sitename} is this easy! Welcome on board.
+										body: `${config.projectName} is this easy! Welcome on board.
 										<br> Complete the sign up process providing the code to the App. Code is only valid for 15 minutes only`,
 										footer: "Once again, welcome!",
 									}),
 								},
 							});
-						if (checkVerified.dataValues.phoneNumber)
-							try {
-								messagingSender({
-									message: `Here is the code ${OTPvalue} to complete your sign up on ${config.sitename}.`,
-									receiver: checkVerified.dataValues.phoneNumber,
-								});
-							} catch (err) {
-								ctx.status = (err as object)["code" as keyof typeof err];
-								ctx.message = (err as object)["message" as keyof typeof err];
-								return;
-							}
 					}
 
 					ctx.status = statusCodes.FOUND;
@@ -255,9 +259,11 @@ router.post(
 	},
 	createNewAccount(),
 	async (ctx) => {
+		// console.log("ctx.state.newUser", ctx.state.newUser);
 		if (ctx.state.newUser) {
 			// create an associated user settings
 			await UserSetting(ctx.sequelizeInstance!).create({ user_uuid: ctx.state.newUser.dataValues.uuid, user_type: "client" });
+
 			const profileData = {
 				status: statusCodes.CREATED,
 				account: ctx.state.newUser.toJSON(),
@@ -278,8 +284,8 @@ router.post(
 			ctx.status = statusCodes.CREATED;
 			return (ctx.body = profileData);
 		} else {
-			ctx.status = statusCodes.SERVICE_UNAVAILABLE;
-			ctx.message = "Oops! Apologies we are currently unable to sign you up but we are working on it.";
+			ctx.status = ctx.state.error.code || statusCodes.SERVICE_UNAVAILABLE;
+			ctx.message = ctx.state.error.message || "Oops! Apologies we are currently unable to sign you up but we are working on it.";
 			return;
 		}
 	},
@@ -288,14 +294,12 @@ router.post(
 /**
  * Direct Sign in process without 2FA option
  * @openapi
- * /v1/user/sign-in:
+ * /login:
  *   post:
  *     tags:
- *       - Unified Non-admin Access
- *     summary: Sign in a client/delivery partner user account
- *     description: Make a post request with the user credential to server to sign in
- *     parameters:
- *       - $ref: '#/components/parameters/appID'
+ *       - Client Users
+ *     summary: Sign in a client user account
+ *     description: Make a post request with the user credential to server to log in
  *     requestBody:
  *       description: Request body can be available as json formated or FormData
  *       required: true
@@ -332,7 +336,6 @@ router.post(
  *                   description: User data
  *                   anyOf:
  *                     - $ref: "#/components/schemas/Client"
- *                     - $ref: "#/components/schemas/DeliveryPartner"
  *               example:
  *                 status: 200
  *                 token: 64nc576t7r98ct7n6578wn90cmu8r99id97ty7nc7w09
@@ -401,14 +404,12 @@ router.post(
 /**
  * 2FA specific sign-in
  * @openapi
- * /v1/user/sign-in/2fa:
+ * /login/2fa:
  *   post:
  *     tags:
- *       - Unified Non-admin Access
+ *       - Client Users
  *     summary: "Account that has 'secured' enabled will require 2FA"
  *     description: An account can optionally opt to enable 2FA. When this is the case, the '/sign-in' endpoint would instead return a token with a redirect status. Send the token as payload with the 2FA code from authenticator to this endpoint to process sign-in for 2fa enabled account
- *     parameters:
- *       - $ref: '#/components/parameters/appID'
  *     requestBody:
  *       description: Request body can be available as json formated or FormData
  *       required: true
@@ -439,7 +440,6 @@ router.post(
  *                   description: User data
  *                   anyOf:
  *                     - $ref: "#/components/schemas/Client"
- *                     - $ref: "#/components/schemas/DeliveryPartner"
  *               example:
  *                 status: 200
  *                 token: 64nc576t7r98ct7n6578wn90cmu8r99id97ty7nc7w09
@@ -500,19 +500,21 @@ router.post(
  */
 
 router.post(
-	["/user/sign-in", "/user/sign-in/2fa"],
+	["/login", "/login/2fa"],
 	requestParser({ multipart: true }),
 	async (ctx, next) => {
-		//console.log('ctx.path', ctx.path)
+		console.log("ctx.path", ctx.path);
+		console.log("ctx.request.body: ", ctx.request.body);
+
 		if (!ctx.request.body) {
 			ctx.status = statusCodes.BAD_REQUEST;
 			ctx.message = ctx.path.includes("/sign-in/2fa")
 				? "Please provide the code from your authenticator app to continue"
 				: "Oops! No login detail provided.";
 			return;
-		} else if (!ctx.request.body.email && !ctx.request.body.phoneNumber) {
+		} else if (!ctx.request.body.email) {
 			ctx.status = statusCodes.BAD_REQUEST;
-			ctx.message = "Either a user email or phone number must be provided to sign in";
+			ctx.message = "Either a user email must be provided to sign in";
 			return;
 		}
 		await next();
@@ -542,7 +544,7 @@ router.post(
 							ctx,
 							detail: `You signed into your account`,
 							meta: {
-								target: ctx.state.userType,
+								target: "Client",
 								uuid: "self", //user.uuid,
 							},
 							sendMail: settings.dataValues.sendNotificationsBy.includes("email"),
@@ -556,16 +558,16 @@ router.post(
 
 			const OTPvalueOrUrl = (await otpLinkGenerator({
 				sequelize: ctx.sequelizeInstance!,
-				entityReference: ctx.state.userType,
-				numberOfOTPChar: ctx.state.userType === "DeliveryPartner" ? 6 : 4,
-				typeOfOTPChar: ctx.state.userType === "DeliveryPartner" ? "alphanumeric" : "numbers",
+				entityReference: "Client",
+				numberOfOTPChar: 4,
+				typeOfOTPChar: "numbers",
 				queryIdentifier: signinId,
-				log: ctx.state.userType + ": Verification code sent for an unverified user",
+				log: "Client: Verification code sent for an unverified user",
 				expiry: "15m",
-				route: ctx.state.userType === "DeliveryPartner" ? "/api/v1/s/otp/newuser" : undefined, //available at dir system/otp/newUserVerify.routes
-				returnOTP: ctx.state.userType === "DeliveryPartner" ? false : true,
+				route: undefined, //available at dir system/otp/newUserVerify.routes
+				returnOTP: true,
 			})) as string;
-			//console.log("OTPvalueOrUrl", OTPvalueOrUrl);
+			// console.log("OTPvalueOrUrl", OTPvalueOrUrl);
 			if (OTPvalueOrUrl) {
 				if (Array.isArray(OTPvalueOrUrl) && OTPvalueOrUrl[0] === "pendingOtp") {
 					ctx.status = statusCodes.TOO_EARLY;
@@ -582,35 +584,18 @@ router.post(
 						subject: `New verification code generated for ${user.firstName}`,
 						content: {
 							text: `Hello ${user.firstName}. We need you to verify your account. ${
-								ctx.state.userType === "DeliveryPartner"
-									? "Click the verification link: " + OTPvalueOrUrl
-									: "Enter the code: " + OTPvalueOrUrl
+								"Enter the code: " + OTPvalueOrUrl
 							} to complete the process.`,
 							html: newUserAccountCreationTemplate({
-								verificationLink: ctx.state.userType === "DeliveryPartner" ? OTPvalueOrUrl + `&userType=DeliveryPartner` : undefined, //insert user account type as query to verification link
-								otp: ctx.state.userType !== "DeliveryPartner" ? OTPvalueOrUrl : undefined,
+								verificationLink: undefined, //insert user account type as query to verification link
+								otp: OTPvalueOrUrl,
 								greetings: `Howdy!`,
 								name: user.firstName,
-								body: `A new verification ${
-									ctx.state.userType === "DeliveryPartner" ? "link" : "code"
-								} has been generated for you and only valid for 15 minutes`,
+								body: `A new verification ${"code"} has been generated for you and only valid for 15 minutes`,
 								footer: "Once again, welcome!",
 							}),
 						},
 					});
-				else
-					try {
-						messagingSender({
-							message: `Here is the ${
-								ctx.state.userType === "DeliveryPartner" ? "link" : "code"
-							} ${OTPvalueOrUrl} to verify your account on ${config.sitename}.`,
-							receiver: signinId,
-						});
-					} catch (err) {
-						ctx.status = (err as object)["code" as keyof typeof err];
-						ctx.message = (err as object)["message" as keyof typeof err];
-						return;
-					}
 			}
 			//ctx.body = undefined; //remove data
 			ctx.body = {
@@ -629,28 +614,6 @@ router.post(
 			return;
 		}
 	},
-	async (ctx, next) => {
-		/* Perform Client authentication first */
-		await next();
-		/*
-		 if CLient authentication fails with 404, continue and check if Delivery Partner authentication because a combined endpoint is used for both.
-		 
-		 Once both are done. Process is returned to await in the upstream
-		*/
-		if (ctx.status === 404) {
-			ctx.state.userType = "DeliveryPartner"; // set for later use
-
-			await signAccountInLocal({
-				userRole: false,
-				userType: "DeliveryPartner",
-				signInType: (ctx) => ctx.request.body.email || ctx.request.body.phoneNumber,
-				accessTokenLifetime: (ctx) => ctx.request.body.rememberMe,
-			})(ctx, next);
-		} else {
-			ctx.state.userType = "Client";
-			return;
-		}
-	},
 	signAccountInLocal({
 		userRole: false,
 		userType: "Client",
@@ -662,14 +625,12 @@ router.post(
 /**
  * Reset user passowrd
  * @openapi
- * /v1/user/reset-password:
+ * /reset-password:
  *   post:
  *     tags:
- *       - Unified Non-admin Access
+ *       - Client Users
  *     summary: Reset a user password
- *     description: "Make a post request with the user email/phone number to server to start the password reset process. This send an OTP code to the user email/phone number. The code should then be used on 'api/v1/user/set-new-password' endpoint to complete the process. Resubmit to initiate OTP resend; but keep in mind that a 60 seconds retry policy is put in place to avoid abuse!"
- *     parameters:
- *       - $ref: '#/components/parameters/appID'
+ *     description: "Make a post request with the user email to server to start the password reset process. This send an OTP code to the user email. The code should then be used on '/v1/set-new-password' endpoint to complete the process. Resubmit to initiate OTP resend; but keep in mind that a 60 seconds retry policy is put in place to avoid abuse!"
  *     requestBody:
  *       description: Request body can be available as json formated or FormData
  *       required: true
@@ -709,7 +670,7 @@ router.post(
  */
 
 router.post(
-	"/user/reset-password",
+	"/reset-password",
 	authenticateEncryptedToken,
 	requestParser(),
 	async (ctx, next) => {
@@ -730,33 +691,25 @@ router.post(
 /**
  * validate user passowrd reset
  * @openapi
- * /v1/user/set-new-password:
+ * /set-new-password:
  *   post:
  *     tags:
- *       - Unified Non-admin Access
+ *       - Client Users
  *     summary: Confirm user password reset
  *     description: Call endpoint to complete password reset process by providing new password
  *     parameters:
- *       - $ref: '#/components/parameters/appID'
  *       - in: query
  *         name: id
  *         schema:
  *           type: string
  *         required: true
- *         description: The ID here is the user's valid email or phone number
+ *         description: The ID here is the user's valid email
  *       - in: query
  *         name: otp
  *         schema:
  *           type: string
  *         required: true
- *         description: "A valid OTP code. Get code from: 'api/v1/user/reset-password' endpoint"
- *       - in: query
- *         name: userType
- *         schema:
- *           type: string
- *           enum: ["Admin", "Client", "DeliveryPartner"]
- *         required: true
- *         description: Define the user type. Either 'Admin', 'Client' or 'DeliveryPartner'. This is used to determine the user model to use for OTP verification
+ *         description: "A valid OTP code. Get code from: '/v1/reset-password' endpoint"
  *     requestBody:
  *       description: Request body can be available as json formated or FormData
  *       required: true
@@ -797,7 +750,7 @@ router.post(
  *         description: Unexpected server error occured
  */
 router.post(
-	"/user/set-new-password",
+	"/set-new-password",
 	requestParser({ multipart: true }),
 	async (ctx, next) => {
 		// lets compare the new password and repeated password
@@ -811,16 +764,8 @@ router.post(
 			ctx.message = "Password must be present in request";
 			return;
 		}
-		// check user type
-		const userType = ctx.query["userType"];
-		if (userType && typeof userType === "string" && ["Client", "DeliveryPartner"].includes(userType)) {
-			ctx.state.userType = userType;
-			await next();
-		} else {
-			ctx.status = statusCodes.BAD_REQUEST;
-			ctx.message = "The user type is needed to be defined as a query parameter, as Client or DeliveryPartner";
-			return;
-		}
+
+		await next();
 	},
 	otpLinkVerifier,
 	async (ctx) => {
@@ -867,7 +812,7 @@ router.post(
 
 // Third parties signing-in start-up link
 router.get(
-	"/user/sign-in-with/:appName",
+	"/sign-in-with/:appName",
 	signAccountInWithThirdParty({
 		userRole: false,
 		userType: "dummy", // deprecate this in core. It's added here to avoid server error
@@ -876,7 +821,7 @@ router.get(
 
 // third party re-directs here after confirmation
 router.get(
-	"/user/sign-in-with/:appName/verify",
+	"/sign-in-with/:appName/verify",
 	signAccountInWithThirdPartyVerifier({
 		userRole: false,
 		userType: "dummy", // deprecate this in core. It's added here to avoid server error
@@ -885,11 +830,11 @@ router.get(
 
 // Signing-in after a 3rd party social media account has authenticated an account
 router.get(
-	"/user/sign-in-as",
+	"/sign-in-as",
 	signAccountInWithThirdPartyValidateAs({
 		userRole: false,
 		userType: "dummy", // deprecate this in core. It's added here to avoid server error
 	}),
 );
 
-export { router as publicUsers };
+export { router as publicClientUsers };

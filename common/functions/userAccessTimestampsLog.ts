@@ -27,12 +27,13 @@ export const userAccessTimestampsLog = async (
 		else bodyAttributes["log"] = "Access timestamp was updated <br/>";
 	}
 
+	// console.log("sequelize", sequelize);
 	return await sequelize.transaction(async (t) => {
 		let access = {};
 		let userAccessTimestamp = await UserAccessTimestamp(sequelize).findByPk(user, {
 			transaction: t,
 		});
-		if (userAccessTimestamp instanceof UserAccessTimestamp) {
+		if (userAccessTimestamp instanceof UserAccessTimestamp(sequelize)) {
 			if (bodyAttributes["log"]) bodyAttributes["log"] = userAccessTimestamp.dataValues.log + bodyAttributes["log"];
 			await userAccessTimestamp.update(bodyAttributes, { transaction: t });
 			access = userAccessTimestamp.toJSON();

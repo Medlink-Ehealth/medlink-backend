@@ -1,8 +1,7 @@
 import Joi from "joi";
 import { joiPasswordExtendCore } from "joi-password";
 import { Next } from "koa";
-import { AppContext } from "../@types/utils.js";
-import { validatorHandler, phoneNumberValidator, throwError } from "@medlink/common";
+import { validatorHandler, phoneNumberValidator, throwError, AppContext } from "@medlink/common";
 
 const joiPassword = Joi.extend(joiPasswordExtendCore);
 

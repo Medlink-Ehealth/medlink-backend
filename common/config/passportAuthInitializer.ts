@@ -196,9 +196,11 @@ export const passportAuthInitializer = async (passport: typeof passportLib) => {
 			let authorization = req.headers.authorization?.split(" ")[1]; // may also contain tenantMode prefix introduced in greybox v2.0
 			// check for the tenantMode set
 			const tenantMode = appInstance.currentContext?.tenantMode;
-			if (tenantMode && authorization && authorization.startsWith(tenantMode + "_")) authorization = authorization.substring(tenantMode.length + 1); // strip the db prefix
+			if (tenantMode && authorization && authorization.startsWith(tenantMode + "_"))
+				authorization = authorization.substring(tenantMode.length + 1); // strip the db prefix
 
-			const token = authorization || req.body ? req.body["token"] : undefined;
+			const token = authorization || req.body?.["token"];
+
 			if (!token) {
 				//new Error("Bad token in request");
 				return done(null, false);

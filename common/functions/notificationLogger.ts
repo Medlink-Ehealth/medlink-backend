@@ -9,7 +9,7 @@ import { UUID4Validator } from "./UUID4Validator.js";
 import { throwError } from "./throwError.js";
 import { Server, Socket } from "socket.io";
 import { Notification } from "../models/Notification.model.js";
-import config from "../../platform.config.js";
+import { config } from "../platform.config.js";
 import { mailSender } from "./mailSender.js";
 
 const notificationLogger = async ({
@@ -87,7 +87,7 @@ const notificationLogger = async ({
 					// when no specific filter exists, send to all target connect clients
 					if (!meta.filter) {
 						if (ctx.ioSocket) (ctx.ioSocket as Socket).to(meta.target).emit("notification", notification);
-					} else {
+					} else if (ctx.io) {
 						const sockets = await (ctx.io as Server).fetchSockets();
 						sockets.forEach((socket) => {
 							let passSocket = true; // true means to broadcast to socket

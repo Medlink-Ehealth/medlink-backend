@@ -4,7 +4,7 @@ import SMTPTransport from "nodemailer/lib/smtp-transport";
 import sanitizeHtml from "sanitize-html";
 import { Readable } from "node:stream";
 import { MailOptions } from "nodemailer/lib/sendmail-transport/index.js";
-import config from "../../platform.config.js";
+import { config } from "../platform.config.js";
 import { logger } from "../utils/logger.js";
 
 //REF: https://mailtrap.io/blog/sending-emails-with-nodemailer
@@ -185,7 +185,7 @@ const extractReceivers = (
 const mailSender = async (
 	{
 		sender, //'Daemon <deamon@nodemailer.com>'
-		subject = `Mail from ${config.sitename}`,
+		subject = `Mail from ${config.projectName}`,
 		content,
 		receiver,
 		batchSending = false, // set to true to send email in batch mode
@@ -208,7 +208,7 @@ const mailSender = async (
 	doLog?: boolean, // log can alternatively be set as 2nd argument.
 ) => {
 	// allow custom import of site address rather than use sitewide settings
-	let SITE_ADDRESS = siteAddress ? siteAddress : config.siteAddress;
+	let SITE_ADDRESS = siteAddress ? siteAddress : config.serverAddress;
 	// sanitize website address
 	SITE_ADDRESS = SITE_ADDRESS?.includes("//") ? SITE_ADDRESS.split("//")[1] : SITE_ADDRESS;
 	SITE_ADDRESS = SITE_ADDRESS?.includes("www.") ? SITE_ADDRESS.split("www.")[1] : SITE_ADDRESS;
@@ -226,7 +226,7 @@ const mailSender = async (
 			: MAIL_SERVER_NOREPLY_MAIL + "@" + SITE_ADDRESS
 		: undefined;
 
-	const senderEmailPlaceholder = defaultSiteNoreply ? `${config.sitename} <${defaultSiteNoreply}>` : undefined; //'Daemon <deamon@nodemailer.com>'
+	const senderEmailPlaceholder = defaultSiteNoreply ? `${config.projectName} <${defaultSiteNoreply}>` : undefined; //'Daemon <deamon@nodemailer.com>'
 	// set a default sender when omitted in props
 	if (!sender && senderEmailPlaceholder) sender = senderEmailPlaceholder;
 
@@ -234,7 +234,10 @@ const mailSender = async (
 
 	// Let's ensure server address is setup
 	if (!serverConfig.SMTP_HOST || !serverConfig.SMTP_PORT) {
-		logger.error("Email server non-functional and email sending would not be processed as server is undefined");
+		logger.error(
+			"Email server non-functional and email sending would not be processed as server is undefined." +
+				(process.env.NODE_ENV !== "production" ? " DevMode content: " + JSON.stringify(content, null, 2) : ""),
+		);
 		new Error("Email sending is non-functional because server not defined.");
 		return;
 	}

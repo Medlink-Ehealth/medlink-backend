@@ -1,6 +1,7 @@
 import { DataTypes, Model, ModelStatic, Sequelize } from "sequelize";
 import { UserSetting } from "./UserSetting.model.js";
-import { sequelizeInstances } from "../../config/db.config.js";
+import { sequelizeInstances } from "@medlink/common";
+
 const instances = Object.values(sequelizeInstances);
 
 /**
@@ -166,15 +167,13 @@ instances.map((sequelize) => {
 			updatedAt: "updated",
 			paranoid: true,
 			deletedAt: "deleted",
-			sequelize,
+			sequelize: sequelize,
 			modelName: "Client", // We need to choose the model name
 		},
 	);
 
 	client.hasOne(UserSetting(sequelize), {
 		as: "Setting",
-		constraints: false,
-		foreignKey: "user_uuid",
 		scope: { user_type: "client" },
 		onDelete: "CASCADE",
 		onUpdate: "CASCADE",
@@ -182,9 +181,7 @@ instances.map((sequelize) => {
 	UserSetting(sequelize).belongsTo(client, {
 		foreignKey: "user_uuid",
 		constraints: false,
-		//as: 'ClientSettingOwner'
 	});
-
 });
 
 export const Client = (db: Sequelize) => db.models["Client"] as ModelStatic<ClientStatic>;
@@ -194,13 +191,15 @@ type Attr = {
 	firstName: string;
 	lastName?: string;
 	phoneNumber?: string;
-	email?: string;
+	email: string;
 	password: string;
 	role: number;
 	state: boolean;
 	secured: boolean;
 	verified: boolean;
 	type: "client";
+	created?: string;
+	updated?: string;
 };
 export interface ClientStatic extends Model<Attr>, Attr {
 	toJSON(): Attr;

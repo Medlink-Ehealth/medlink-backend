@@ -28,7 +28,7 @@ export const otpVerifier = async (sequelize: Sequelize, otp: number | string, id
 			const getOTP = await OTP(sequelize).findOne({
 				where: whereFilter,
 			});
-			//console.log("otpVerifier | getOTP: ", getOTP);
+			// console.log("otpVerifier | getOTP: ", getOTP);
 
 			if (getOTP && getOTP instanceof OTP(sequelize) && getOTP.dataValues && getOTP.dataValues.id) {
 				const thisId = getOTP.dataValues.id;

@@ -1,7 +1,8 @@
 import { DataTypes, Model, ModelStatic, Sequelize } from "sequelize";
 import { AdminRole } from "./AdminRole.model.js";
 import { UserSetting } from "./UserSetting.model.js";
-import { sequelizeInstances } from "../../config/db.config.js";
+import { sequelizeInstances } from "@medlink/common";
+
 const instances = Object.values(sequelizeInstances);
 /*
   Admin ranks are defined by roles in interger values. 
@@ -199,15 +200,13 @@ instances.map((sequelize) => {
 			updatedAt: "updated",
 			paranoid: true,
 			deletedAt: "deleted",
-			sequelize,
+			sequelize: sequelize,
 			modelName: "Admin", // We need to choose the model name
 		},
 	);
 
 	admin.hasOne(UserSetting(sequelize), {
 		as: "Setting",
-		constraints: false,
-		foreignKey: "user_uuid",
 		scope: { user_type: "admin" },
 		onDelete: "CASCADE",
 		onUpdate: "CASCADE",
@@ -215,7 +214,6 @@ instances.map((sequelize) => {
 	UserSetting(sequelize).belongsTo(admin, {
 		foreignKey: "user_uuid",
 		constraints: false,
-		//as: 'AdminSettingOwner'
 	});
 });
 
@@ -234,6 +232,8 @@ type Attr = {
 	secured?: boolean;
 	verified?: boolean;
 	type: "admin";
+	created?: string;
+	updated?: string;
 };
 export interface AdminStatic extends Model<Attr>, Attr {
 	toJSON(): Attr;

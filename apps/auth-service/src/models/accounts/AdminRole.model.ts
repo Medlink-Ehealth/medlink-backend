@@ -1,5 +1,6 @@
+import { sequelizeInstances } from "@medlink/common";
 import { DataTypes, Model, Sequelize } from "sequelize";
-import { sequelizeInstances } from "../../config/db.config.js";
+
 const instances = Object.values(sequelizeInstances);
 
 /*
@@ -39,7 +40,7 @@ instances.map((sequelize) => {
 		{
 			tableName: "admin_roles",
 			timestamps: false,
-			sequelize,
+			sequelize: sequelize,
 			modelName: "AdminRole", // We need to choose the model name
 		},
 	);

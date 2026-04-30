@@ -1,54 +1,35 @@
 // routes imports
 import config from "../../app.config.js";
 import swaggerDocs from "../../app.swagger.js";
-import { v1 } from "./v1/index.js";
+// import { v1 } from "./v1/index.js";
 import appConfig from "../../app.config.js";
-import { logger, throwError } from "@medlink/common";
-import { Router } from "../../../../common/middlewares/router.js";
+import { Router } from "@medlink/common";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { readdirSync } from "node:fs";
 
-// contorl allowed methods
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+// get all api versions in directory
+const apiVs = readdirSync(__dirname, { withFileTypes: true })
+	// filter to directory
+	.filter((dir) => dir.isDirectory())
+	.map((dir) => dir.name);
+
+// const resolve = (p: string) => path.resolve(__dirname, p);
+// const projectRoot = process.cwd();
+// console.log("apiVs", apiVs);
+
+// control allowed methods
 const enforcedMethods = config.methods;
 const allowableMethods = (
 	enforcedMethods && Array.isArray(enforcedMethods) && enforcedMethods.length ? enforcedMethods : ["get", "post", "patch", "delete"]
 ).map((method) => method.toLowerCase());
-
-// lets ensure request is from a trusted source
-const AppIDsFunc: () => string[] | null = () => {
-	// X_REQUEST_REFERRAL is an arrays of strings in env variable
-	try {
-		const ids = process.env.X_REQUEST_REFERRAL ? JSON.parse(process.env.X_REQUEST_REFERRAL) : undefined;
-		return ids && Array.isArray(ids) && ids.length ? ids : null;
-	} catch (err) {
-		logger.error("Remote App ID checker error for API endpoint!", err);
-		return throwError(500, (err as Error) || "Oops! Server error occurred in parsing authorised App IDs");
-	}
-};
-const AppIDs = AppIDsFunc();
-
-// html response template
-const htmlPlaceholder = `
-            <!DOCTYPE html>
-            <html lang="en">
-              <head>
-                <meta charset="UTF-8" />
-                <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-                <title>Powered by Greybox.</title>
-              </head>
-              <body>
-                <div>
-                 Hey! Let's track back abit... Seems you missed the magic word!!!
-                </div>
-              </body>
-            </html>
-        `;
 
 const router = Router();
 router.use(async (ctx, next) => {
 	// control allowed methods for App
 	if (!allowableMethods.includes(ctx.method.toLowerCase())) return ctx.throw(405, "Method not allowed!");
 
-	//console.log("request types", ctx.accepts("json", "text", "html"));
-	// Enforce header Content-Type as 'application/json' or 'multipart/form-data'
 	if (
 		ctx.method.toLowerCase() === "get" ||
 		ctx.accepts("json", "text", "html") ||
@@ -59,62 +40,45 @@ router.use(async (ctx, next) => {
 				ctx.header["content-type"] === "application/vnd.api+json" ||
 				(ctx.header["content-type"] && ctx.header["content-type"].includes("multipart/form-data"))))
 	) {
-		// verify app requester identity in header or query param
-		const appReferral = ctx.get("x-request-referral") || ctx.query["x-request-referral"];
-
-		let identifiedInbound = false; // boolean for checker
-
-		if (appReferral && typeof appReferral === "string" && AppIDs && AppIDs.includes(appReferral)) identifiedInbound = true;
-		// the ID referral may alternatively be the header identifier itself
-		else if (AppIDs) {
-			for (const id of AppIDs) {
-				if (ctx.get(id)) {
-					identifiedInbound = true;
-					break;
-				}
-			}
-		}
-		// continue process if App ID is verifiable
-		if (identifiedInbound) await next();
-		// lets exclude swagger doc link from returning error endpoint placeholder
-		else if (AppIDs && AppIDs.length && (ctx.path === "/api/docs" || ctx.path === "/api/docs/spec" || ctx.path === "/api")) {
-			const accessID = ctx.query["id"];
-			if (accessID && typeof accessID === "string" && AppIDs.includes(accessID)) await next();
-			else {
-				// Output doc endpoint validation failure
-				ctx.status = 202;
-				ctx.type = ".html";
-				return (ctx.body = htmlPlaceholder);
-			}
-		} else {
-			logger.error("Unrecognisable App! Define App ID in request header to access api endpoints!");
-			// Let customise what is returned when ID validation fails
-			const apiMode = config.appMode === "apiOnly";
-			ctx.status = apiMode ? 202 : 400;
-			if (apiMode) ctx.type = ".html";
-			return (ctx.body = apiMode ? htmlPlaceholder : "Unrecognisable App! Define App ID in request header to access api endpoints!");
-		}
+		await next();
 	} else {
-		ctx.throw(406, "Unsupported content-type!");
+		return ctx.throw(406, "Unsupported content-type!");
 	}
 });
 
-const routerAPI = Router({
-	prefix: "/api",
-});
-// routerAPI.use(v1.routes());
-/**
- * Swagger docs main endpoint
- */
-routerAPI.get("/docs", (ctx, next) => {
-	// lets extract key ID
-	const accessID = ctx.query["id"];
+/* We are creating a dynamic router version here such that all available version is auto load if or when available */
+for (const versionDir of apiVs) {
+	const dir = path.resolve(path.join(__dirname, versionDir, "index.js"));
+	const vIndex = await import(dir);
+	const version = vIndex && (Object.values(vIndex)[0] as typeof Router);
 
-	return swaggerDocs({
-		title: (appConfig.sitename || appConfig.sitenameFull) + " API",
-		version: "1.0.0",
-		description: `Access key => '''${accessID}''' || API endpoints developed with Greybox`,
-		/* "termsOfService": "http://example.com/terms/",
+	if (!version) continue;
+
+	const routerAPI = Router();
+	routerAPI.use(version.routes()); // import v1 routes - and extendable to future versioning
+
+	/**
+	 * Swagger docs main endpoint
+	 */
+	routerAPI.get("/:version/docs", async (ctx, next) => {
+		// lets extract key ID
+		const apiVersion = ctx.params["version"];
+		// check if version is valid
+		if (!apiVersion || !apiVs.includes(apiVersion)) {
+			return (ctx.body = {
+				status: 404,
+				statusText: `This API service seems to be working but this api version or endpoint isn't`,
+			});
+		}
+
+		const versionExtract = apiVersion.substring(apiVersion.length - 1, apiVersion.length);
+
+		return await swaggerDocs(
+			{
+				title: (appConfig.serviceName || appConfig.projectName) + " API",
+				version: "1.0.0",
+				description: `API Version => '''${versionExtract}'''`,
+				/* "termsOfService": "http://example.com/terms/",
 					"contact": {
 						"name": "API Support",
 						"url": "http://www.example.com/support",
@@ -124,8 +88,15 @@ routerAPI.get("/docs", (ctx, next) => {
 						"name": "Apache 2.0",
 						"url": "https://www.apache.org/licenses/LICENSE-2.0.html"
 					},, */
-	})(ctx, next);
-});
+			},
+			{
+				routePrefix: `/${apiVersion}/docs`, // route where the view is returned
+				specPrefix: `/${apiVersion}/docs/spec`, // route where the spec is returned
+			},
+		)(ctx, next);
+	});
+	router.use(routerAPI.routes());
+}
 
 /**
  * Use to return the '/' api endpoint of the outputs in the middleware above
@@ -147,16 +118,22 @@ routerAPI.get("/docs", (ctx, next) => {
  *       500:
  *         description: This let's you know if a server error occured
  */
-routerAPI.all("/", (ctx) => {
+router.all("/:version", (ctx) => {
+	const versionDefination = ctx.params["version"];
+
+	const checkVersion =
+		versionDefination && apiVs.includes(versionDefination)
+			? "'Version: " + versionDefination.substring(versionDefination.length - 1, versionDefination.length) + "'"
+			: "Unknown Version";
+
 	ctx.status = 200;
 	return (ctx.body = {
 		status: 200,
-		statusText: "This verifies that API endpoints are accessible",
+		statusText: `Awesome! This verifies that API ${checkVersion === "Unknown Version" ? `server is accessible. Request should however be built such that the API version is defined; such as: ${ctx.host}/${apiVs[0]}` : checkVersion + " is accessible and working!"}`,
 	});
 });
 
-router.use(routerAPI.routes());
-export default router;
+export { router };
 
 /**
  *  Global props

@@ -1,25 +1,13 @@
-import { AppContext } from "../../../../common/@types/utils.js";
-import { statusCodes } from "../../../../common/constants/index.js";
-import { Admin } from "../models/accounts/Admin.model.js";
-import { otpLinkGenerator } from "../../../../common/functions/otpLinkGenerator.js";
-import { mailSender } from "../../../../common/functions/mailSender.js";
-import { defaultMailTemplate } from "../../../../common/functions/mailTemplates/defaultMailTemplate.js";
-import { logger } from "../../../../common/utils/logger.js";
+import { AppContext, defaultMailTemplate, logger, mailSender, otpLinkGenerator, statusCodes } from "@medlink/common";
 import { Client, ClientStatic } from "../models/accounts/Client.model.js";
 
 const resetPassword = async (ctx: AppContext) => {
-	const { email, phoneNumber } = ctx.request.body;
-	// let protect against bad combination owned by different users
-	if (email && phoneNumber) {
-		ctx.status = statusCodes.BAD_REQUEST;
-		ctx.message = "Only one of email or phone number is required for password reset";
-		return;
-	}
-	const whereFilter = email ? { email: email } : phoneNumber ? { phoneNumber: phoneNumber } : null;
+	const { email } = ctx.request.body;
+	const whereFilter = email ? { email: email } : null;
 
 	if (!whereFilter) {
 		ctx.status = statusCodes.BAD_REQUEST;
-		ctx.message = "Either email or phone number must be provided for password reset";
+		ctx.message = "Email must be provided for password reset";
 		return;
 	} else if (!ctx.sequelizeInstance) {
 		logger.error("resetPassword Error: ", "No active ctx.sequelizeInstance to match request to!");
@@ -37,9 +25,9 @@ const resetPassword = async (ctx: AppContext) => {
 				expiry: "15m",
 				numberOfOTPChar: 4,
 				typeOfOTPChar: "numbers",
-				entityReference: user instanceof Client ? "Client" : "DeliveryPartner",
-				queryIdentifier: email && phoneNumber ? [email, phoneNumber] : email ? email : phoneNumber,
-				log: `${user instanceof Client ? "Client" : "DeliveryPartner"} user account password reset`,
+				entityReference: "Client",
+				queryIdentifier: email,
+				log: `Client user account password reset`,
 				//route: validationUrl ? validationUrl : ctx.path, // optional use current ctx route as dummy path
 				//siteAddress: siteAddress,
 				returnOTP: true,
@@ -86,11 +74,11 @@ const resetPassword = async (ctx: AppContext) => {
 			ctx.status = statusCodes.OK;
 			return (ctx.body = {
 				status: statusCodes.OK,
-				statusText: "Password reset initiated and reset code sent to user email and/or phone number",
+				statusText: "Password reset initiated and reset code sent to user email.",
 			});
 		}
 		ctx.status = statusCodes.NOT_FOUND;
-		ctx.message = `Oops! The ${email && phoneNumber ? "email and phone number" : email ? "email" : "phone number"} looks incorrect. Please verify the email and try again.`;
+		ctx.message = `Oops! The email looks incorrect. Please verify the email and try again.`;
 		return;
 	} catch (err) {
 		logger.error("Password reset error:", err);

@@ -1,7 +1,7 @@
 import { Op, Sequelize } from "sequelize";
 import { alphaNumericCodeGenerator } from "./alphaNumericCodeGenerator.js";
 import { getOffsetTimestamp } from "./getOffsetTimestamp.js";
-import config from "../../platform.config.js";
+import { config } from "../platform.config.js";
 import { OTP } from "../models/OTP.model.js";
 import { logger } from "../utils/logger.js";
 
@@ -32,7 +32,7 @@ export const otpLinkGenerator = async ({
 	returnOTP?: boolean;
 }): Promise<string | string[] | ["pendingOtp", string] | null> => {
 	try {
-		let verificationSiteAddress = !returnOTP ? (siteAddress ? siteAddress : config.siteAddress) : undefined;
+		let verificationSiteAddress = !returnOTP ? (siteAddress ? siteAddress : config.projectName) : undefined;
 		if (verificationSiteAddress && verificationSiteAddress.endsWith("/"))
 			verificationSiteAddress = verificationSiteAddress.substring(0, verificationSiteAddress.length - 1);
 
