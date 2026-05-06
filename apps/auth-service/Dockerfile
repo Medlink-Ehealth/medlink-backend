@@ -7,11 +7,11 @@ RUN corepack enable && corepack prepare pnpm@9 --activate
 # ── deps: install all workspace deps (dev included for build) ────────────────
 FROM base AS deps
 WORKDIR /app
-# Copy manifests + lockfile so this layer is cached unless deps change
-COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
+# Copy manifests only first so this layer is cached unless deps change
+COPY package.json pnpm-workspace.yaml ./
 COPY common/package.json ./common/
 COPY apps/auth-service/package.json ./apps/auth-service/
-RUN pnpm install --frozen-lockfile
+RUN pnpm install --no-frozen-lockfile
 
 # ── builder: compile common then auth-service ────────────────────────────────
 FROM deps AS builder
@@ -29,10 +29,10 @@ WORKDIR /app
 ENV NODE_ENV=production
 
 # Install production deps only (workspace symlinks for @medlink/common included)
-COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
+COPY package.json pnpm-workspace.yaml ./
 COPY common/package.json ./common/
 COPY apps/auth-service/package.json ./apps/auth-service/
-RUN pnpm install --prod --frozen-lockfile && \
+RUN pnpm install --prod --no-frozen-lockfile && \
     pnpm store prune && \
     rm -rf /root/.cache/node/corepack /root/.local/share/pnpm
 
