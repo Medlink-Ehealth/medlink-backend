@@ -32,7 +32,9 @@ ENV NODE_ENV=production
 COPY package.json pnpm-workspace.yaml ./
 COPY common/package.json ./common/
 COPY apps/auth-service/package.json ./apps/auth-service/
-RUN pnpm install --prod --no-frozen-lockfile
+RUN pnpm install --prod --no-frozen-lockfile && \
+    pnpm store prune && \
+    rm -rf /root/.cache/node/corepack /root/.local/share/pnpm
 
 # Copy compiled output from builder
 COPY --from=builder /app/common/dist ./common/dist
