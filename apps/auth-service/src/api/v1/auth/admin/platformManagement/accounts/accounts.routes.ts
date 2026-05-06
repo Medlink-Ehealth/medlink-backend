@@ -259,7 +259,8 @@ router.get(
 							groupUsersByType[key] = usersGroup.map((account) => {
 								const thisAccount = account.toJSON() as AdminUser;
 								if (UsersAccessTimestamps[thisAccount.uuid]) {
-									thisAccount['access' as 'firstName'] = UsersAccessTimestamps[thisAccount.uuid] as any;
+									// eslint-disable-next-line @typescript-eslint/no-explicit-any
+					thisAccount['access' as 'firstName'] = UsersAccessTimestamps[thisAccount.uuid] as any;
 								}
 								if (UserRoles && UserRoles.length)
 									for (let i = 0; i < UserRoles.length; i++) {

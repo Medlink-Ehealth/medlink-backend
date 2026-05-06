@@ -1,6 +1,5 @@
 import { Next } from "koa";
 import { Client } from "../models/accounts/Client.model.js";
-import { Op } from "sequelize";
 import {
 	AppContext,
 	getOffsetTimestamp,

@@ -17,14 +17,6 @@ const roles = [
 	{ level: 4, label: "Manager" },
 	{ level: 999, label: "Dev" },
 ];
-//OTP test data
-const dummyOTP = {
-	code: "codeVerifier",
-	ref: "Account",
-	id: "06c198a4-4428-4ac6-bbee-d7621fd16d33",
-	markForDeletionBy: getOffsetTimestamp("-24"),
-	log: "Account verification",
-};
 
 const modelsSync = async (sequelize: Sequelize) => {
 	// if dev mode.

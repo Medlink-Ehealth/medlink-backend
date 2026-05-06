@@ -50,7 +50,6 @@ async function defaultTablesUp() {
 			return true;
 		} catch (err) {
 			logger.error({ on: "Default models", log: err });
-			console.log("Error, Default models: ", err);
 			//return err;
 		}
 	};
@@ -60,7 +59,7 @@ async function defaultTablesUp() {
 		if (mainTable) {
 			try {
 				for (const sequelize of instances) {
-					sequelize.transaction(async (t) => {
+					sequelize.transaction(async () => {
 						logger.info("Dependent Tables UP");
 					});
 				}

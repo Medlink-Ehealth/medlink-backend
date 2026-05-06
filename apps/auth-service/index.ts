@@ -1,5 +1,5 @@
 import "dotenv/config";
-import { server, storageConnector } from "@medlink/common";
+import { server, storageConnector, logger } from "@medlink/common";
 import { router } from "./src/api/api.entry.router.js";
 import { jobScheduler } from "./src/cron/jobScheduler.js";
 import { redis } from "./src/performance.controller.js";
@@ -12,7 +12,7 @@ export default (async () => {
 	(async () => {
 		const storage = new storageConnector();
 		const status = await storage.testConnectivity();
-		console.log("Conversation storage connected: ", status);
+		logger.info("Conversation storage connected: " + String(status));
 		// lets ensure our storage account is setup before allowing server to start
 		if (!status) throw new Error("Storage connectivity is unsuccessful and App is unable to start up");
 	})();

@@ -40,7 +40,6 @@ const isRedis = async (): Promise<Redis | null> =>
 				})
 				.on("ready", () => {
 					logger.info("Redis client connected... 😊");
-					console.log("Redis client connected... 😊");
 					two000Count = 0; // reset retry tracker
 					resolve(redis);
 				});

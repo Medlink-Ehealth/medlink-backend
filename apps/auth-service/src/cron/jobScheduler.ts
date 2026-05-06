@@ -6,6 +6,7 @@ const jobScheduler = async () => {
 	//every minute cron
 	cron.schedule("* * * * *", () => {
 		try {
+			// placeholder
 		} catch (err) {
 			logger.error("Every minute cron error: ", err);
 		}
@@ -13,6 +14,7 @@ const jobScheduler = async () => {
 	//every 5mins cron
 	cron.schedule("*/5 * * * *", () => {
 		try {
+			// placeholder
 		} catch (err) {
 			logger.error("Every 5mins cron error: ", err);
 		}
@@ -20,6 +22,7 @@ const jobScheduler = async () => {
 	//every 30mins cron
 	cron.schedule("*/30 * * * *", () => {
 		try {
+			// placeholder
 		} catch (err) {
 			logger.error("Every 30mins cron error: ", err);
 		}
@@ -27,7 +30,7 @@ const jobScheduler = async () => {
 	//hourly cron
 	cron.schedule("0 * * * *", () => {
 		try {
-			//emptyPageBin();
+			// placeholder
 		} catch (err) {
 			logger.error("Hourly cron error: ", err);
 		}
@@ -35,6 +38,7 @@ const jobScheduler = async () => {
 	//every 2hrs
 	cron.schedule("0 */2 * * *", () => {
 		try {
+			// placeholder
 		} catch (err) {
 			logger.error("every 2hrs cron error: ", err);
 		}
@@ -42,6 +46,7 @@ const jobScheduler = async () => {
 	//every 3hrs
 	cron.schedule("0 */3 * * *", () => {
 		try {
+			// placeholder
 		} catch (err) {
 			logger.error("every 3hrs cron error: ", err);
 		}
@@ -49,6 +54,7 @@ const jobScheduler = async () => {
 	//every 6hrs
 	cron.schedule("0 */6 * * *", () => {
 		try {
+			// placeholder
 		} catch (err) {
 			logger.error("every 6hrs cron error: ", err);
 		}
@@ -94,7 +100,7 @@ const jobScheduler = async () => {
 		}
 	});
 
-	console.log("cronJobs...... loaded!");
+	logger.info("cronJobs...... loaded!");
 };
 
 export { jobScheduler };

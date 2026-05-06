@@ -503,8 +503,6 @@ router.post(
 	["/login", "/login/2fa"],
 	requestParser({ multipart: true }),
 	async (ctx, next) => {
-		console.log("ctx.path", ctx.path);
-		console.log("ctx.request.body: ", ctx.request.body);
 
 		if (!ctx.request.body) {
 			ctx.status = statusCodes.BAD_REQUEST;

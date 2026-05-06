@@ -1,0 +1,129 @@
+replicaCount: 2
+
+image:
+  repository: ""   # set at deploy time: --set image.repository=<acr>.azurecr.io/auth-service
+  tag: ""          # set at deploy time: --set image.tag=<sha>
+  pullPolicy: IfNotPresent
+
+# AKS with --attach-acr does not need imagePullSecrets; add here if using a separate pull secret
+imagePullSecrets: []
+
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
+
+podAnnotations: {}
+
+podSecurityContext:
+  runAsNonRoot: true
+  fsGroup: 1000
+
+securityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop: [ALL]
+
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 3001
+
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+    # kubernetes.io/ingress.class: nginx
+    # cert-manager.io/cluster-issuer: letsencrypt-prod
+  hosts:
+    - host: auth.medlink.local
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+  # - secretName: auth-medlink-tls
+  #   hosts:
+  #     - auth.medlink.local
+
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 100m
+    memory: 256Mi
+
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 70
+
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+# Persistent volume for site/ directory (SQLite DB + local file uploads).
+# Use Azure Files storage class for multi-pod write sharing.
+# For Azure Blob Storage uploads, disable this and set env.CONVERSATION_MEDIA_STORAGE=azure.
+persistence:
+  enabled: false
+  storageClass: "azurefile-csi"
+  accessMode: ReadWriteMany
+  size: 5Gi
+  mountPath: /app/apps/auth-service/site
+
+# Non-sensitive runtime configuration — rendered into a ConfigMap
+env:
+  NODE_ENV: production
+  PORT: "3001"
+  # Database — override DIALECT to sqlite only for single-replica dev/staging
+  DIALECT: postgres
+  DB_HOST: ""
+  DB_PORT: "5432"
+  DB_NAME: medlink
+  DB_SCHEMA: public
+  # Redis — leave empty to fall back to in-process LRU cache
+  REDIS_HOST: ""
+  REDIS_PORT: "6379"
+  # Media storage — set to 'azure' and provide CONVERSATION_MEDIA_STORAGE_PATH JSON in the secret
+  CONVERSATION_MEDIA_STORAGE: azure
+  # Mail server (non-credential config)
+  MAIL_SERVER_SMTP_HOST: ""
+  MAIL_SERVER_SMTP_PORT: "465"
+  MAIL_SERVER_SECURE_STATE: "true"
+
+# Name of a pre-existing Kubernetes Secret containing sensitive values.
+# Create it once with kubectl or the Azure Key Vault Secrets Store CSI driver.
+# Required keys:
+#   DB_USER, DB_PASS
+#   JWT_SECRET_KEY, APP_PASETO_KEY
+#   COOKIE_IDENTIFIER, COOKIE_KEYS
+#   MAIL_SERVER_AUTH_MAIL, MAIL_SERVER_AUTH_PASS
+#   MAIL_SERVER_NOREPLY_MAIL, MAIL_SERVER_NOREPLY_PASS
+#   googleID, googleSECRET
+#   CONVERSATION_MEDIA_STORAGE_PATH  (JSON blob for azure storage; or local path)
+existingSecret: "auth-service-secrets"
+
+livenessProbe:
+  httpGet:
+    path: /health
+    port: 3001
+  initialDelaySeconds: 30
+  periodSeconds: 10
+  failureThreshold: 3
+
+readinessProbe:
+  httpGet:
+    path: /health
+    port: 3001
+  initialDelaySeconds: 10
+  periodSeconds: 5
+  failureThreshold: 3
+
+nodeSelector: {}
+tolerations: []
+affinity: {}

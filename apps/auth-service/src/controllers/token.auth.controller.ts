@@ -3,7 +3,6 @@
 import { decryptToken, encryptionToken, logger, Next, RouterExtendedDefaultContext, statusCodes } from "@medlink/common";
 
 import config from "../../app.config.js";
-import Redis from "ioredis";
 import { redis, Cache } from "../performance.controller.js";
 
 /**
