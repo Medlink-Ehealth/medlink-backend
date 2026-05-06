@@ -12,10 +12,6 @@ on:
     
   workflow_dispatch:
 
-permissions:
-  id-token: write
-  contents: read
-
 jobs:
   Auth-Service-ci:
     uses: Medlink-Ehealth/pipeline-templates/.github/workflows/shared-ci.yml@feat/node-ci-template
