@@ -3,5 +3,9 @@ packages:
   - 'apps/*'
   # all shared functionality in directly in common/
   - 'common'
+allowBuilds:
+  esbuild: set this to true or false
+  sharp: set this to true or false
+  sqlite3: set this to true or false
 onlyBuiltDependencies:
   - sqlite3

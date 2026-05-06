@@ -60,18 +60,18 @@ router.use(publicAdminRoutes.routes());
  */
 
 router.post(
-	"/token/refresh",
-	requestParser(),
-	refreshAccessToken({
-		useCacheIfNoRedis: config.useCacheAsRedisIsNotAvailable,
-		accessTokenLifetime: config.authTokenLifetime,
-		refreshTokenLifetime: config.refreshTokenLifetime,
-	}),
-	(ctx) => {
-		// refreshAccessToken used as middleware expects to handover to next middleware. We are ending that process here
-		ctx.status = 200;
-		return (ctx.body = { ...ctx.body, status: 200 });
-	},
+  "/token/refresh",
+  requestParser(),
+  refreshAccessToken({
+    useCacheIfNoRedis: config.useCacheAsRedisIsNotAvailable,
+    accessTokenLifetime: config.authTokenLifetime,
+    refreshTokenLifetime: config.refreshTokenLifetime,
+  }),
+  (ctx) => {
+    // refreshAccessToken used as middleware expects to handover to next middleware. We are ending that process here
+    ctx.status = 200;
+    return (ctx.body = { ...ctx.body, status: 200 });
+  },
 );
 
 export { router as nonAuthAccountRelatedRoutes };

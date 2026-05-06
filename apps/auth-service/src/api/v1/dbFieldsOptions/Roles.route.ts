@@ -2,7 +2,7 @@ import { Router, statusCodes } from "@medlink/common";
 import { AdminRole } from "../../../models/accounts/index.js";
 
 const router = Router({
-	prefix: "/roles",
+  prefix: "/roles",
 });
 
 /**
@@ -39,33 +39,33 @@ const router = Router({
  *         description: Unexpected server error occured
  */
 router.get("/", async (ctx) => {
-	if (ctx.state.user.role && Number(ctx.state.user.role) > 3) {
-		try {
-			const roles = await AdminRole(ctx.sequelizeInstance!).findAll();
-			if (roles) {
-				ctx.status = statusCodes.OK;
-				ctx.body = {
-					status: statusCodes.OK,
-					options: roles,
-				};
-				return;
-			}
-			ctx.status = statusCodes.OK;
-			ctx.body = {
-				status: statusCodes.OK,
-				options: {},
-			};
-			return;
-			// eslint-disable-next-line @typescript-eslint/no-unused-vars
-		} catch (err) {
-			ctx.status = statusCodes.SERVER_ERROR;
-			ctx.message = "Server error";
-			return;
-		}
-	} else {
-		ctx.status = statusCodes.UNAUTHORIZED;
-		ctx.message = "Oops! Unauthorised access";
-	}
+  if (ctx.state.user.role && Number(ctx.state.user.role) > 3) {
+    try {
+      const roles = await AdminRole(ctx.sequelizeInstance!).findAll();
+      if (roles) {
+        ctx.status = statusCodes.OK;
+        ctx.body = {
+          status: statusCodes.OK,
+          options: roles,
+        };
+        return;
+      }
+      ctx.status = statusCodes.OK;
+      ctx.body = {
+        status: statusCodes.OK,
+        options: {},
+      };
+      return;
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    } catch (err) {
+      ctx.status = statusCodes.SERVER_ERROR;
+      ctx.message = "Server error";
+      return;
+    }
+  } else {
+    ctx.status = statusCodes.UNAUTHORIZED;
+    ctx.message = "Oops! Unauthorised access";
+  }
 });
 
 export default router;

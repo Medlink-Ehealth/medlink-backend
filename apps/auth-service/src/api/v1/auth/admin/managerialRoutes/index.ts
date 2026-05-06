@@ -6,12 +6,12 @@ const router = Router("management");
 
 // Check authorisation status
 router.use(async (ctx, next) => {
-	if (ctx.state.user.role < 2) {
-		ctx.status = statusCodes.UNAUTHORIZED;
-		ctx.message = "Oops! Management privilege is needed here";
-		return;
-	}
-	await next();
+  if (ctx.state.user.role < 2) {
+    ctx.status = statusCodes.UNAUTHORIZED;
+    ctx.message = "Oops! Management privilege is needed here";
+    return;
+  }
+  await next();
 });
 
 // site.settings.route

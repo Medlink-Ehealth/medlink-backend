@@ -18,12 +18,13 @@ admin roles = [
 
 // Check admin authorisation status
 router.use(async (ctx, next) => {
-	if (ctx.state.user.type !== "admin") {
-		ctx.status = statusCodes.UNAUTHORIZED;
-		ctx.message = "Oops! User type not eligible/authorized to access administration resources.";
-		return;
-	}
-	await next();
+  if (ctx.state.user.type !== "admin") {
+    ctx.status = statusCodes.UNAUTHORIZED;
+    ctx.message =
+      "Oops! User type not eligible/authorized to access administration resources.";
+    return;
+  }
+  await next();
 });
 
 router.use(managerialRoutes.routes());

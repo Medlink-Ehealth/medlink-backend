@@ -26,24 +26,24 @@ const roles = [
 
 // bind model to each api env
 instances.map((sequelize) => {
-	class adminRole extends Model {}
-	adminRole.init(
-		{
-			level: {
-				type: DataTypes.INTEGER,
-				primaryKey: true,
-			},
-			label: {
-				type: DataTypes.STRING,
-			},
-		},
-		{
-			tableName: "admin_roles",
-			timestamps: false,
-			sequelize: sequelize,
-			modelName: "AdminRole", // We need to choose the model name
-		},
-	);
+  class adminRole extends Model {}
+  adminRole.init(
+    {
+      level: {
+        type: DataTypes.INTEGER,
+        primaryKey: true,
+      },
+      label: {
+        type: DataTypes.STRING,
+      },
+    },
+    {
+      tableName: "admin_roles",
+      timestamps: false,
+      sequelize: sequelize,
+      modelName: "AdminRole", // We need to choose the model name
+    },
+  );
 });
 
 export const AdminRole = (db: Sequelize) => db.models["AdminRole"];

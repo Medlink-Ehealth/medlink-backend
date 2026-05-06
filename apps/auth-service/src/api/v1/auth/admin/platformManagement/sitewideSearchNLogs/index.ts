@@ -5,7 +5,7 @@ const router = Router();
 
 // Check privilege/status
 router.use(async (ctx, next) => {
-	await next();
+  await next();
 });
 
 router.use(platformWideSearchRoutes.routes());

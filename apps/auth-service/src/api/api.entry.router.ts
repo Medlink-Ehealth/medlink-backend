@@ -11,9 +11,9 @@ import { readdirSync } from "node:fs";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // get all api versions in directory
 const apiVs = readdirSync(__dirname, { withFileTypes: true })
-	// filter to directory
-	.filter((dir) => dir.isDirectory())
-	.map((dir) => dir.name);
+  // filter to directory
+  .filter((dir) => dir.isDirectory())
+  .map((dir) => dir.name);
 
 // const resolve = (p: string) => path.resolve(__dirname, p);
 // const projectRoot = process.cwd();
@@ -22,63 +22,70 @@ const apiVs = readdirSync(__dirname, { withFileTypes: true })
 // control allowed methods
 const enforcedMethods = config.methods;
 const allowableMethods = (
-	enforcedMethods && Array.isArray(enforcedMethods) && enforcedMethods.length ? enforcedMethods : ["get", "post", "patch", "delete"]
+  enforcedMethods && Array.isArray(enforcedMethods) && enforcedMethods.length
+    ? enforcedMethods
+    : ["get", "post", "patch", "delete"]
 ).map((method) => method.toLowerCase());
 
 const router = Router();
 router.use(async (ctx, next) => {
-	// control allowed methods for App
-	if (!allowableMethods.includes(ctx.method.toLowerCase())) return ctx.throw(405, "Method not allowed!");
+  // control allowed methods for App
+  if (!allowableMethods.includes(ctx.method.toLowerCase()))
+    return ctx.throw(405, "Method not allowed!");
 
-	if (
-		ctx.method.toLowerCase() === "get" ||
-		ctx.accepts("json", "text", "html") ||
-		(ctx.method.toLowerCase() !== "get" &&
-			(ctx.is("application/json") ||
-				ctx.is("application/vnd.api+json") ||
-				ctx.header["content-type"] === "application/json" ||
-				ctx.header["content-type"] === "application/vnd.api+json" ||
-				(ctx.header["content-type"] && ctx.header["content-type"].includes("multipart/form-data"))))
-	) {
-		await next();
-	} else {
-		return ctx.throw(406, "Unsupported content-type!");
-	}
+  if (
+    ctx.method.toLowerCase() === "get" ||
+    ctx.accepts("json", "text", "html") ||
+    (ctx.method.toLowerCase() !== "get" &&
+      (ctx.is("application/json") ||
+        ctx.is("application/vnd.api+json") ||
+        ctx.header["content-type"] === "application/json" ||
+        ctx.header["content-type"] === "application/vnd.api+json" ||
+        (ctx.header["content-type"] &&
+          ctx.header["content-type"].includes("multipart/form-data"))))
+  ) {
+    await next();
+  } else {
+    return ctx.throw(406, "Unsupported content-type!");
+  }
 });
 
 /* We are creating a dynamic router version here such that all available version is auto load if or when available */
 for (const versionDir of apiVs) {
-	const dir = path.resolve(path.join(__dirname, versionDir, "index.js"));
-	const vIndex = await import(dir);
-	const version = vIndex && (Object.values(vIndex)[0] as typeof Router);
+  const dir = path.resolve(path.join(__dirname, versionDir, "index.js"));
+  const vIndex = await import(dir);
+  const version = vIndex && (Object.values(vIndex)[0] as typeof Router);
 
-	if (!version) continue;
+  if (!version) continue;
 
-	const routerAPI = Router();
-	routerAPI.use(version.routes()); // import v1 routes - and extendable to future versioning
+  const routerAPI = Router();
+  routerAPI.use(version.routes()); // import v1 routes - and extendable to future versioning
 
-	/**
-	 * Swagger docs main endpoint
-	 */
-	routerAPI.get("/:version/docs", async (ctx, next) => {
-		// lets extract key ID
-		const apiVersion = ctx.params["version"];
-		// check if version is valid
-		if (!apiVersion || !apiVs.includes(apiVersion)) {
-			return (ctx.body = {
-				status: 404,
-				statusText: `This API service seems to be working but this api version or endpoint isn't`,
-			});
-		}
+  /**
+   * Swagger docs main endpoint
+   */
+  routerAPI.get("/:version/docs", async (ctx, next) => {
+    // lets extract key ID
+    const apiVersion = ctx.params["version"];
+    // check if version is valid
+    if (!apiVersion || !apiVs.includes(apiVersion)) {
+      return (ctx.body = {
+        status: 404,
+        statusText: `This API service seems to be working but this api version or endpoint isn't`,
+      });
+    }
 
-		const versionExtract = apiVersion.substring(apiVersion.length - 1, apiVersion.length);
+    const versionExtract = apiVersion.substring(
+      apiVersion.length - 1,
+      apiVersion.length,
+    );
 
-		return await swaggerDocs(
-			{
-				title: (appConfig.serviceName || appConfig.projectName) + " API",
-				version: "1.0.0",
-				description: `API Version => '''${versionExtract}'''`,
-				/* "termsOfService": "http://example.com/terms/",
+    return await swaggerDocs(
+      {
+        title: (appConfig.serviceName || appConfig.projectName) + " API",
+        version: "1.0.0",
+        description: `API Version => '''${versionExtract}'''`,
+        /* "termsOfService": "http://example.com/terms/",
 					"contact": {
 						"name": "API Support",
 						"url": "http://www.example.com/support",
@@ -88,14 +95,14 @@ for (const versionDir of apiVs) {
 						"name": "Apache 2.0",
 						"url": "https://www.apache.org/licenses/LICENSE-2.0.html"
 					},, */
-			},
-			{
-				routePrefix: `/${apiVersion}/docs`, // route where the view is returned
-				specPrefix: `/${apiVersion}/docs/spec`, // route where the spec is returned
-			},
-		)(ctx, next);
-	});
-	router.use(routerAPI.routes());
+      },
+      {
+        routePrefix: `/${apiVersion}/docs`, // route where the view is returned
+        specPrefix: `/${apiVersion}/docs/spec`, // route where the spec is returned
+      },
+    )(ctx, next);
+  });
+  router.use(routerAPI.routes());
 }
 
 /**
@@ -119,18 +126,23 @@ for (const versionDir of apiVs) {
  *         description: This let's you know if a server error occured
  */
 router.all("/:version", (ctx) => {
-	const versionDefination = ctx.params["version"];
+  const versionDefination = ctx.params["version"];
 
-	const checkVersion =
-		versionDefination && apiVs.includes(versionDefination)
-			? "'Version: " + versionDefination.substring(versionDefination.length - 1, versionDefination.length) + "'"
-			: "Unknown Version";
+  const checkVersion =
+    versionDefination && apiVs.includes(versionDefination)
+      ? "'Version: " +
+        versionDefination.substring(
+          versionDefination.length - 1,
+          versionDefination.length,
+        ) +
+        "'"
+      : "Unknown Version";
 
-	ctx.status = 200;
-	return (ctx.body = {
-		status: 200,
-		statusText: `Awesome! This verifies that API ${checkVersion === "Unknown Version" ? `server is accessible. Request should however be built such that the API version is defined; such as: ${ctx.host}/${apiVs[0]}` : checkVersion + " is accessible and working!"}`,
-	});
+  ctx.status = 200;
+  return (ctx.body = {
+    status: 200,
+    statusText: `Awesome! This verifies that API ${checkVersion === "Unknown Version" ? `server is accessible. Request should however be built such that the API version is defined; such as: ${ctx.host}/${apiVs[0]}` : checkVersion + " is accessible and working!"}`,
+  });
 });
 
 export { router };

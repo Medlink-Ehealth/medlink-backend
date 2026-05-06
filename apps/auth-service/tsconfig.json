@@ -1,21 +1,21 @@
 {
-	"extends": "../../tsconfig.json",
-	"compilerOptions": {
-		"resolveJsonModule": true,
-		"outDir": "./dist",
-		"rootDir": "." // Root is service package root
-		// "typeRoots": [
-		//   "../../node_modules/@types",
-		//   "../../common/types"
-		// ]
-	},
-	"include": [
-		"index.ts",
-		"redis.config.ts",
-		"app.config.ts",
-		"app.swagger.ts",
-		"src/**/*.ts"
-	],
-	"exclude": ["node_modules", "dist", "**/*.test.ts", "**/*.spec.ts"],
-	"references": [{ "path": "../../common" }]
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "resolveJsonModule": true,
+    "outDir": "./dist",
+    "rootDir": "." // Root is service package root
+    // "typeRoots": [
+    //   "../../node_modules/@types",
+    //   "../../common/types"
+    // ]
+  },
+  "include": [
+    "index.ts",
+    "redis.config.ts",
+    "app.config.ts",
+    "app.swagger.ts",
+    "src/**/*.ts"
+  ],
+  "exclude": ["node_modules", "dist", "**/*.test.ts", "**/*.spec.ts"],
+  "references": [{ "path": "../../common" }]
 }

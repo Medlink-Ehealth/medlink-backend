@@ -8,7 +8,7 @@ import { otpEndpoints } from "./otp/index.routes.js";
 const routerPrefix = "/v1";
 
 const router = Router({
-	prefix: routerPrefix,
+  prefix: routerPrefix,
 });
 
 // misc

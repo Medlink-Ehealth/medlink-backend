@@ -1,16 +1,16 @@
 import {
-	JsonObject,
-	Router,
-	authenticateEncryptedToken,
-	hashPassword,
-	logger,
-	mailSender,
-	newUserAccountCreationTemplate,
-	notificationLogger,
-	otpLinkGenerator,
-	otpLinkVerifier,
-	requestParser,
-	statusCodes,
+  JsonObject,
+  Router,
+  authenticateEncryptedToken,
+  hashPassword,
+  logger,
+  mailSender,
+  newUserAccountCreationTemplate,
+  notificationLogger,
+  otpLinkGenerator,
+  otpLinkVerifier,
+  requestParser,
+  statusCodes,
 } from "@medlink/common";
 import { adminFormValidator } from "../../../validators/adminFormValidator.js";
 import { AdminUser } from "../../../@types/index.js";
@@ -19,10 +19,10 @@ import { adminController } from "../../../controllers/admin.addon.userController
 import { Admin } from "../../../models/accounts/Admin.model.js";
 import validator from "validator";
 import {
-	signAccountInLocal,
-	signAccountInWithThirdParty,
-	signAccountInWithThirdPartyValidateAs,
-	signAccountInWithThirdPartyVerifier,
+  signAccountInLocal,
+  signAccountInWithThirdParty,
+  signAccountInWithThirdPartyValidateAs,
+  signAccountInWithThirdPartyVerifier,
 } from "../../../controllers/account.controller.js";
 
 const router = Router("admin");
@@ -242,108 +242,122 @@ const router = Router("admin");
  */
 
 router.post(
-	["/login", "/login/2fa"],
-	requestParser({ multipart: true }),
-	async (ctx, next) => {
-		//console.log('ctx.path', ctx.path)
-		if (!ctx.request.body) {
-			ctx.status = statusCodes.BAD_REQUEST;
-			ctx.message = ctx.path.includes("/sign-in/2fa")
-				? "Please provide the code from your authenticator app to continue"
-				: "Oops! No login detail provided.";
-			return;
-		}
-		await next();
-	},
-	adminFormValidator.signin,
-	async (ctx, next) => {
-		// process sign in, & since token is always needed for riidein model, let ensure signAccountInLocal always returns it without needing to explicitly set it in Request header
-		ctx.header["x-requesttoken"] = "token";
-		await next();
+  ["/login", "/login/2fa"],
+  requestParser({ multipart: true }),
+  async (ctx, next) => {
+    //console.log('ctx.path', ctx.path)
+    if (!ctx.request.body) {
+      ctx.status = statusCodes.BAD_REQUEST;
+      ctx.message = ctx.path.includes("/sign-in/2fa")
+        ? "Please provide the code from your authenticator app to continue"
+        : "Oops! No login detail provided.";
+      return;
+    }
+    await next();
+  },
+  adminFormValidator.signin,
+  async (ctx, next) => {
+    // process sign in, & since token is always needed for riidein model, let ensure signAccountInLocal always returns it without needing to explicitly set it in Request header
+    ctx.header["x-requesttoken"] = "token";
+    await next();
 
-		//console.log('ctx.ioSocket', ctx.ioSocket)
-		//lets ensure data is available
-		type body = { account: AdminUser; status: 200 };
-		if (!ctx.body || (ctx.body && (ctx.body as body).status !== 200)) return;
+    //console.log('ctx.ioSocket', ctx.ioSocket)
+    //lets ensure data is available
+    type body = { account: AdminUser; status: 200 };
+    if (!ctx.body || (ctx.body && (ctx.body as body).status !== 200)) return;
 
-		const user = (ctx.body as body)["account"];
-		// let's overwrite account data if user is unverified
-		if (user && user.verified) {
-			/* Process notifications */
-			UserSetting(ctx.sequelizeInstance!)
-				.findByPk(user.uuid)
-				.then((settings) => {
-					if (settings && settings.dataValues.notificationsToReceive.includes("signingIn"))
-						notificationLogger({
-							ctx,
-							detail: `You signed into your account`,
-							meta: {
-								target: "Admin",
-								uuid: "self", //user.uuid,
-							},
-							sendMail: settings.dataValues.sendNotificationsBy.includes("email"),
-						});
-				});
-			// end
-			return;
-		} else {
-			const OTPvalue = (await otpLinkGenerator({
-				sequelize: ctx.sequelizeInstance!,
-				entityReference: "Admin",
-				numberOfOTPChar: 4,
-				typeOfOTPChar: "numbers",
-				queryIdentifier:
-					user.email && user.phoneNumber ? [user.email, user.phoneNumber] : user.email ? user.email : (user.phoneNumber as string),
-				log: "Admin: Verification code sent for an unverified user",
-				expiry: "15m",
-				//route: "/verify/newuser", //available at dir system/otp/newUserVerify.routes
-				returnOTP: true,
-			})) as string;
+    const user = (ctx.body as body)["account"];
+    // let's overwrite account data if user is unverified
+    if (user && user.verified) {
+      /* Process notifications */
+      UserSetting(ctx.sequelizeInstance!)
+        .findByPk(user.uuid)
+        .then((settings) => {
+          if (
+            settings &&
+            settings.dataValues.notificationsToReceive.includes("signingIn")
+          )
+            notificationLogger({
+              ctx,
+              detail: `You signed into your account`,
+              meta: {
+                target: "Admin",
+                uuid: "self", //user.uuid,
+              },
+              sendMail:
+                settings.dataValues.sendNotificationsBy.includes("email"),
+            });
+        });
+      // end
+      return;
+    } else {
+      const OTPvalue = (await otpLinkGenerator({
+        sequelize: ctx.sequelizeInstance!,
+        entityReference: "Admin",
+        numberOfOTPChar: 4,
+        typeOfOTPChar: "numbers",
+        queryIdentifier:
+          user.email && user.phoneNumber
+            ? [user.email, user.phoneNumber]
+            : user.email
+              ? user.email
+              : (user.phoneNumber as string),
+        log: "Admin: Verification code sent for an unverified user",
+        expiry: "15m",
+        //route: "/verify/newuser", //available at dir system/otp/newUserVerify.routes
+        returnOTP: true,
+      })) as string;
 
-			if (OTPvalue) {
-				if (Array.isArray(OTPvalue) && OTPvalue[0] === "pendingOtp") {
-					ctx.status = statusCodes.TOO_EARLY;
-					return (ctx.body = {
-						status: statusCodes.TOO_EARLY,
-						statusText: "Retry is too early",
-					});
-				}
-				if (user.email)
-					mailSender({
-						ignoreDevReceiverRewriteToSender: true,
-						sender: "noreply",
-						receiver: user.email,
-						subject: `New verification code generated for ${user.firstName}`,
-						content: {
-							text: `Hello ${user.firstName}`,
-							html: newUserAccountCreationTemplate({
-								otp: OTPvalue,
-								greetings: `Hello ${user.firstName}`,
-								name: user.firstName,
-								body: `A new verification code has been generated for you and only valid for 15 minutes`,
-								footer: "Once again, welcome!",
-							}),
-						},
-					});
-			}
-			//ctx.body = undefined; //remove data
-			ctx.body = {
-				account: {
-					//uuid: user.uuid,
-					verified: user.verified,
-					type: user.type,
-					created: user.created,
-					email: ctx.request.body.email,
-					phoneNumber: ctx.request.body.phoneNumber,
-				},
-				statusText: "Your account is unverified. Kindly verify account with the code sent to your email/phone number.",
-			};
-			ctx.status = statusCodes.FORBIDDEN;
-			ctx.message = "Your account is unverified. Kindly verify account with the code sent to your email/phone number.";
-			return;
-		}
-	},
-	signAccountInLocal({ userRole: "AdminRole", userType: "Admin", accessTokenLifetime: (ctx) => ctx.request.body.rememberMe }),
+      if (OTPvalue) {
+        if (Array.isArray(OTPvalue) && OTPvalue[0] === "pendingOtp") {
+          ctx.status = statusCodes.TOO_EARLY;
+          return (ctx.body = {
+            status: statusCodes.TOO_EARLY,
+            statusText: "Retry is too early",
+          });
+        }
+        if (user.email)
+          mailSender({
+            ignoreDevReceiverRewriteToSender: true,
+            sender: "noreply",
+            receiver: user.email,
+            subject: `New verification code generated for ${user.firstName}`,
+            content: {
+              text: `Hello ${user.firstName}`,
+              html: newUserAccountCreationTemplate({
+                otp: OTPvalue,
+                greetings: `Hello ${user.firstName}`,
+                name: user.firstName,
+                body: `A new verification code has been generated for you and only valid for 15 minutes`,
+                footer: "Once again, welcome!",
+              }),
+            },
+          });
+      }
+      //ctx.body = undefined; //remove data
+      ctx.body = {
+        account: {
+          //uuid: user.uuid,
+          verified: user.verified,
+          type: user.type,
+          created: user.created,
+          email: ctx.request.body.email,
+          phoneNumber: ctx.request.body.phoneNumber,
+        },
+        statusText:
+          "Your account is unverified. Kindly verify account with the code sent to your email/phone number.",
+      };
+      ctx.status = statusCodes.FORBIDDEN;
+      ctx.message =
+        "Your account is unverified. Kindly verify account with the code sent to your email/phone number.";
+      return;
+    }
+  },
+  signAccountInLocal({
+    userRole: "AdminRole",
+    userType: "Admin",
+    accessTokenLifetime: (ctx) => ctx.request.body.rememberMe,
+  }),
 );
 
 /**
@@ -392,24 +406,24 @@ router.post(
  */
 
 router.post(
-	"/admin/reset-password",
-	authenticateEncryptedToken,
-	requestParser(),
-	async (ctx, next) => {
-		//console.log("logg here: ", ctx.request.body);
-		if (ctx.isAuthenticated()) {
-			ctx.status = statusCodes.NOT_MODIFIED;
-			ctx.message = "Admin already Signed In";
-			return;
-		}
-		ctx.state.userType = "Admin";
-		await next();
-	},
-	adminFormValidator.resetPassword,
-	// call custom middleware rathern tan core version
-	adminController.resetPassword({
-		validationUrl: "/set-new-password", //siteAddress: ''
-	}),
+  "/admin/reset-password",
+  authenticateEncryptedToken,
+  requestParser(),
+  async (ctx, next) => {
+    //console.log("logg here: ", ctx.request.body);
+    if (ctx.isAuthenticated()) {
+      ctx.status = statusCodes.NOT_MODIFIED;
+      ctx.message = "Admin already Signed In";
+      return;
+    }
+    ctx.state.userType = "Admin";
+    await next();
+  },
+  adminFormValidator.resetPassword,
+  // call custom middleware rathern tan core version
+  adminController.resetPassword({
+    validationUrl: "/set-new-password", //siteAddress: ''
+  }),
 );
 
 /**
@@ -473,54 +487,78 @@ router.post(
  *       5xx:
  *         description: Unexpected server error occured
  */
-router.post("/set-new-password", requestParser({ multipart: true }), otpLinkVerifier, async (ctx) => {
-	const { newPassword, repeatedNewPassword } = ctx.request.body as JsonObject;
-	if (newPassword !== repeatedNewPassword) {
-		ctx.status = statusCodes.CONFLICT;
-		ctx.message = "Repeated new password is not the same";
-		return;
-	} else if (!newPassword || !repeatedNewPassword) {
-		ctx.status = statusCodes.BAD_REQUEST;
-		ctx.message = "Password must be present in request";
-		return;
-	}
-	const email = ctx.state.otpLinkVerifier;
-	if (!email || !validator.isEmail(email)) {
-		ctx.status = statusCodes.BAD_REQUEST;
-		ctx.message = "Verification link is invalid because one or more query value is missing/invalid";
-		return;
-	}
-	// update admin password in database
-	try {
-		const hashedPassword = hashPassword((newPassword as string).trim());
-		const admin = await Admin(ctx.sequelizeInstance!).update({ password: hashedPassword }, { where: { email: email } });
+router.post(
+  "/set-new-password",
+  requestParser({ multipart: true }),
+  otpLinkVerifier,
+  async (ctx) => {
+    const { newPassword, repeatedNewPassword } = ctx.request.body as JsonObject;
+    if (newPassword !== repeatedNewPassword) {
+      ctx.status = statusCodes.CONFLICT;
+      ctx.message = "Repeated new password is not the same";
+      return;
+    } else if (!newPassword || !repeatedNewPassword) {
+      ctx.status = statusCodes.BAD_REQUEST;
+      ctx.message = "Password must be present in request";
+      return;
+    }
+    const email = ctx.state.otpLinkVerifier;
+    if (!email || !validator.isEmail(email)) {
+      ctx.status = statusCodes.BAD_REQUEST;
+      ctx.message =
+        "Verification link is invalid because one or more query value is missing/invalid";
+      return;
+    }
+    // update admin password in database
+    try {
+      const hashedPassword = hashPassword((newPassword as string).trim());
+      const admin = await Admin(ctx.sequelizeInstance!).update(
+        { password: hashedPassword },
+        { where: { email: email } },
+      );
 
-		if (admin) {
-			ctx.status = statusCodes.OK;
-			ctx.message = `Password updated`;
-			return;
-		} else {
-			ctx.status = statusCodes.BAD_REQUEST;
-			ctx.message = "Currenty unable to identify a valid account";
-			return;
-		}
-	} catch (err) {
-		logger.error("Password reset error:", err);
-		ctx.status = statusCodes.SERVICE_UNAVAILABLE;
-		ctx.message = (err as object)["message" as keyof typeof err]
-			? (err as object)["message" as keyof typeof err]
-			: "Unable to reset password";
-		return;
-	}
-});
+      if (admin) {
+        ctx.status = statusCodes.OK;
+        ctx.message = `Password updated`;
+        return;
+      } else {
+        ctx.status = statusCodes.BAD_REQUEST;
+        ctx.message = "Currenty unable to identify a valid account";
+        return;
+      }
+    } catch (err) {
+      logger.error("Password reset error:", err);
+      ctx.status = statusCodes.SERVICE_UNAVAILABLE;
+      ctx.message = (err as object)["message" as keyof typeof err]
+        ? (err as object)["message" as keyof typeof err]
+        : "Unable to reset password";
+      return;
+    }
+  },
+);
 
 // Third parties signing-in start-up link
-router.get("/sign-in-with/:appName", signAccountInWithThirdParty({ userRole: "AdminRole", userType: "Admin" }));
+router.get(
+  "/sign-in-with/:appName",
+  signAccountInWithThirdParty({ userRole: "AdminRole", userType: "Admin" }),
+);
 
 // third party re-directs here after confirmation
-router.get("/sign-in-with/:appName/verify", signAccountInWithThirdPartyVerifier({ userRole: "AdminRole", userType: "Admin" }));
+router.get(
+  "/sign-in-with/:appName/verify",
+  signAccountInWithThirdPartyVerifier({
+    userRole: "AdminRole",
+    userType: "Admin",
+  }),
+);
 
 // Signing-in after a 3rd party social media account has authenticated an account
-router.get("/sign-in-as", signAccountInWithThirdPartyValidateAs({ userRole: "AdminRole", userType: "Admin" }));
+router.get(
+  "/sign-in-as",
+  signAccountInWithThirdPartyValidateAs({
+    userRole: "AdminRole",
+    userType: "Admin",
+  }),
+);
 
 export { router as publicAdminRoutes };
