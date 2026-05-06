@@ -18,7 +18,7 @@ permissions:
 
 jobs:
   Auth-Service-ci:
-    uses: Medlink-Ehealth/pipeline-templates/.github/workflows/shared-ci.yml@main
+    uses: Medlink-Ehealth/pipeline-templates/.github/workflows/shared-ci.yml@feat/node-ci-template
     with:
       working-directory: './apps/auth-service'
       acr-login-server: 'crmedlinkdev'
