@@ -1,0 +1,26 @@
+name: APIM VNet Deployment
+
+on:
+  push:
+    branches:
+        - main
+        - feature/*
+  pull_request:
+    branches:
+        - main
+        - feature/*
+    
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  Auth-Service-ci:
+    uses: Medlink-Ehealth/pipeline-templates/.github/workflows/shared-ci.yml@main
+    with:
+      working-directory: './apps/auth-service'
+      acr-login-server: 'crmedlinkdev'
+      image-name: 'auth-service'
+    secrets: inherit
