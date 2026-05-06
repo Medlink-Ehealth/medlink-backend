@@ -278,7 +278,7 @@ router.get(
               groupUsersByType[key] = usersGroup.map((account) => {
                 const thisAccount = account.toJSON() as AdminUser;
                 if (UsersAccessTimestamps[thisAccount.uuid]) {
-                  (thisAccount as Record<string, unknown>)["access"] =
+                  (thisAccount as unknown as Record<string, unknown>)["access"] =
                     UsersAccessTimestamps[thisAccount.uuid];
                 }
                 if (UserRoles && UserRoles.length)
