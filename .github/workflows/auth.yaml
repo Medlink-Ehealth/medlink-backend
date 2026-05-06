@@ -24,7 +24,7 @@ jobs:
     with:
       working-directory: './apps/auth-service'
       dockerfile-path: './apps/auth-service/Dockerfile'
-      docker-context: './apps/auth-service'
+      docker-context: '.'
       acr-login-server: 'crmedlinkdev'
       image-name: 'auth-service'
     secrets: inherit
