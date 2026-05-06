@@ -62,6 +62,7 @@ const jobScheduler = async () => {
 	//every 12hrs
 	cron.schedule("0 */12 * * *", () => {
 		try {
+			// placeholder
 		} catch (err) {
 			logger.error("every 12hrs cron error: ", err);
 		}

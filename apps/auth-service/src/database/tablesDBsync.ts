@@ -1,4 +1,4 @@
-import { sequelizeInstances, getOffsetTimestamp, logger, Notification, UserAccessTimestamp, UserSecurity, OTP } from "@medlink/common";
+import { sequelizeInstances, logger, Notification, UserAccessTimestamp, UserSecurity, OTP } from "@medlink/common";
 
 import { Admin } from "../models/accounts/Admin.model.js";
 import { Sequelize } from "sequelize";
