@@ -19,7 +19,6 @@ dist-ssr
 public/files
 *.env
 package-lock.json
-pnpm-lock.yaml
 .envProjectRoot
 */dbInit
 
@@ -42,3 +41,9 @@ report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
 
 # Optional npm cache directory
 .npm
+
+env.copy
+
+# Local docker compose (not tracked)
+docker-compose.yml
+Dockerfile-working.txt
