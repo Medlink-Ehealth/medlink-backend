@@ -1,4 +1,4 @@
-name: APIM VNet Deployment
+name: Auth Service CI
 
 on:
   push:
