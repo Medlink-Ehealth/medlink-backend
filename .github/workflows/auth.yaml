@@ -22,6 +22,7 @@ jobs:
   Auth-Service-ci:
     uses: Medlink-Ehealth/pipeline-templates/.github/workflows/shared-ci.yml@feature/setup-pipeline
     with:
+      dockerfile-path: './apps/auth-service/Dockerfile'
       working-directory: './apps/auth-service'
       acr-login-server: 'crmedlinkdev'
       image-name: 'auth-service'
