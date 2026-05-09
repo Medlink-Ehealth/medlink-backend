@@ -1,56 +1,61 @@
 # syntax=docker/dockerfile:1
+# Build context: repo root
+#   docker build -f apps/auth-service/Dockerfile -t auth-service .
 
-# ── base: shared node + pnpm setup ──────────────────────────────────────────
+# ── base: shared node + pnpm setup ───────────────────────────────────────────
 FROM node:22-alpine AS base
 RUN corepack enable && corepack prepare pnpm@9 --activate
 
-# ── deps: install all workspace deps (dev included for build) ────────────────
+# ── deps: workspace manifests + full install (dev included for build) ─────────
 FROM base AS deps
-WORKDIR /app
-# Copy manifests only first so this layer is cached unless deps change
-COPY package.json pnpm-workspace.yaml ./
-COPY common/package.json ./common/
-COPY apps/auth-service/package.json ./apps/auth-service/
-RUN pnpm install --no-frozen-lockfile
+WORKDIR /build
+COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
+COPY common/package.json                ./common/
+COPY apps/auth-service/package.json     ./apps/auth-service/
+RUN pnpm install --frozen-lockfile
 
-# ── builder: compile common then auth-service ────────────────────────────────
+# ── builder: compile common → auth-service ────────────────────────────────────
 FROM deps AS builder
-COPY tsconfig.json ./
-COPY common/ ./common/
-COPY apps/auth-service/ ./apps/auth-service/
-# build:auth = build:common && tsc for auth-service
+COPY tsconfig.json                      ./
+COPY common/                            ./common/
+COPY apps/auth-service/                 ./apps/auth-service/
 RUN pnpm run build:auth
 
-# ── runner: lean production image ────────────────────────────────────────────
-FROM node:22-alpine AS runner
-RUN corepack enable && corepack prepare pnpm@9 --activate
-WORKDIR /app
+# ── deployer: bundle auth-service with prod deps into a standalone dir ─────────
+# pnpm deploy respects auth-service's "files":["dist"], so /deploy contains:
+#   dist/  package.json  node_modules/ (all prod deps + @medlink/common)
+FROM builder AS deployer
+RUN pnpm --filter auth-service deploy --prod /deploy
+# Trim @medlink/common to dist + package.json only (src not needed at runtime)
+RUN find /deploy/node_modules/@medlink/common \
+         -mindepth 1 -maxdepth 1 \
+         ! -name dist \
+         ! -name package.json \
+         -exec rm -rf {} +
 
+# ── runner: lean production image ─────────────────────────────────────────────
+FROM node:22-alpine AS runner
+WORKDIR /app
 ENV NODE_ENV=production
 
-# Install production deps only (workspace symlinks for @medlink/common included)
-COPY package.json pnpm-workspace.yaml ./
-COPY common/package.json ./common/
-COPY apps/auth-service/package.json ./apps/auth-service/
-RUN pnpm install --prod --no-frozen-lockfile
+# auth-service: dist, package.json, node_modules (includes @medlink/common/dist)
+COPY --from=deployer /deploy/dist           ./dist
+COPY --from=deployer /deploy/package.json   ./package.json
+COPY --from=deployer /deploy/node_modules   ./node_modules
 
-# Copy compiled output from builder
-COPY --from=builder /app/common/dist ./common/dist
-COPY --from=builder /app/apps/auth-service/dist ./apps/auth-service/dist
+# site: mail templates and other static assets
+COPY --from=builder /build/apps/auth-service/site ./site
 
-# Create runtime directories expected by the app (SQLite DB, file uploads)
-RUN mkdir -p apps/auth-service/site/dbInit \
-             apps/auth-service/site/files/global \
-             apps/auth-service/site/files/auth \
-             apps/auth-service/site/files/temp \
-             apps/auth-service/site/settings
+# runtime dirs (site/dbInit already exists as a file in source; only create missing dirs)
+RUN mkdir -p site/files/global \
+             site/files/auth \
+             site/files/auth/temp \
+             site/files/temp \
+             site/settings
 
-# Run as non-root
-RUN addgroup -S medlink && adduser -S medlink -G medlink
-RUN chown -R medlink:medlink /app
+RUN addgroup -S medlink && adduser -S medlink -G medlink \
+    && chown -R medlink:medlink /app
 USER medlink
 
-WORKDIR /app/apps/auth-service
 EXPOSE 3001
-
 CMD ["node", "dist/index.js"]

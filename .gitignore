@@ -47,3 +47,4 @@ env.copy
 
 # Local docker compose (not tracked)
 docker-compose.yml
+Dockerfile-working.txt
