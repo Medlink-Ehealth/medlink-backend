@@ -27,7 +27,7 @@
 # ENV Essentials
   - Each service must have a dedicated defined env file. Hence, create a .env file in each service directory and define the expected key values. See env.copy in service directory for reference.
   - To allow testign even in a production environment, it is always required to set a value for NODE_ENV, as either "production" or "development"
-  - Each service should be configured to run on a unique PORT. Port can be  set with PORT. When absent, a default may be used that can clash if exist ports on server.
+  - Each service should be configured to run on a unique PORT. Port can be set with PORT. When absent, a default may be used that can clash if exist ports on server.
   - Each service is able to plug to 3rd email services for communication. The mechanism/transport configuration is done in env. Below are references for each setting
     - MAIL_SERVER_SECURE_STATE: boolean value to determine if ssl enforcement is required by the emil service. This would often be true.
     - MAIL_SERVER_AUTH_MAIL: USe this to set the defaut email of the service or project
