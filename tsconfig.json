@@ -16,5 +16,5 @@
 	},
 	"include": ["./common/types"],
 	"files": [],
-	"references": [{ "path": "./common" }, { "path": "./apps/auth-service" }]
+	"references": [{ "path": "./common" }, { "path": "./apps/auth-service" }, { "path": "./apps/patience-service" }]
 }
