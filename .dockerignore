@@ -1,0 +1,27 @@
+# Dependencies
+node_modules
+**/node_modules
+
+# Build artifacts (built inside Docker)
+**/dist
+**/*.tsbuildinfo
+
+# Git & CI
+.git
+.github
+
+# Local env files — never bake secrets into the image
+.env
+.env.*
+**/env.copy
+
+# Docs & misc
+*.md
+LICENSE
+docker-compose*.yml
+
+# Test artefacts
+coverage
+vitest.config.ts
+**/*.test.ts
+**/*.spec.ts

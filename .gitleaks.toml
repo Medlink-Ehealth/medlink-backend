@@ -1,0 +1,15 @@
+title = "Medlink gitleaks config"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Suppress known false positives"
+paths = [
+  # Template env file — all values are placeholders, never real credentials
+  '''(^|/)env\.copy$''',
+  # Route files contain Swagger/OpenAPI JSDoc field names (password, token, etc.) not real secrets
+  '''\.routes\.ts$''',
+  # 2FA utility shows TOTP URI structure with example secret field — not a hardcoded credential
+  '''twoFa\.ts$''',
+]
