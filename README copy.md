@@ -142,40 +142,8 @@ For local files management, the following can be used to group uploaded files. A
 
 ### Misc
 - If required, cookie identifiers and keys can be set using the below
-    - 'COOKIE_IDENTIFIER': A unique string value
-    - 'COOKIE_KEYS': Use an array of strings values for improved complexity
+    - `COOKIE_IDENTIFIER`: A unique string value
+    - `COOKIE_KEYS`: Use an array of strings values for improved complexity
 
 - Each service can be configured with a setting file that can be potentially updated directly from the UI for privileged users without requiring a redeployment. When such need arises, use `settings` key in env to set the directory containing such configuration file(s).
-
-<!-- ---
-
-## 🐳 Deployment with Docker
-
-### Quick Start (Local Docker)
-Each service includes a `Dockerfile`. To spin up the entire platform:
-```bash
-docker-compose up --build
-```
-
-### Manual Build & Push
-To build a specific service image (e.g., `auth-service`):
-```bash
-docker build -t your-registry/auth-service:latest -f ./apps/auth-service/Dockerfile .
-```
-
----
-
-## 🚀 CI/CD Pipelines
-Automated workflows are defined in `.github/workflows/`:
-- **`ci.yml`**: Runs linting and tests on Pull Requests.
-- **`build-push.yml`**: Builds and pushes Docker images to your registry on merges to `main`.
-
-### Required GitHub Secrets
-Add these in **Settings > Secrets and variables > Actions**:
-- `DOCKERHUB_USERNAME`
-- `DOCKERHUB_TOKEN`
-- `AZURE_CREDENTIALS` (If using Azure storage)
-
----
- -->
 
