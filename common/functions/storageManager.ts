@@ -32,8 +32,8 @@ type azureObject = {
 	CONTAINER_NAME: string;
 };
 const envs = process.env;
-const envMediaStorage = envs["CONVERSATION_MEDIA_STORAGE"] as string;
-const envMediaStoragePath = envs["CONVERSATION_MEDIA_STORAGE_PATH"] as string;
+const envMediaStorage = envs["MEDIA_STORAGE"] as string;
+const envMediaStoragePath = envs["MEDIA_STORAGE_PATH"] as string;
 const dataPath = envMediaStorage === "azure" ? (JSON.parse(envMediaStoragePath) as azureObject) : envMediaStoragePath;
 
 // const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -103,7 +103,7 @@ class LocalStorageService {
 					? relativeToProjectRootContainer
 					: relativeToProjectRootContainer.join("/")
 				: "storage",
-			typeof dataPath === "string" ? dataPath : "local",
+			typeof dataPath === "string" ? dataPath : "files",
 		); // neccessary for upload destinations. Note that "/site/files/" directory is auto managed internally by greybox. Hence we are enforcing a new holding directory to handle the needed scenario here so Greybox can ignire the files
 	}
 
