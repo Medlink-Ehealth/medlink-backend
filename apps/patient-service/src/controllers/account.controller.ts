@@ -25,7 +25,7 @@ import fs from "node:fs";
 import compose from "koa-compose";
 import { Op, Sequelize } from "sequelize";
 import config from "../../app.config.js";
-import { Cache, redis } from "../performance.controller.js";
+import { Cache, redis } from "../../../../common/src/performance.controller.js";
 
 const { googleID, googleSECRET, fbID, fbSECRET } = process.env;
 

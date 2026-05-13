@@ -1,39 +1,12 @@
 import { Op } from "sequelize";
 import { dbQuerier, Notification, Router, statusCodes } from "@medlink/common";
-import { AdminRole } from "../../../../models/accounts/AdminRole.model.js";
 
 const router = Router({
-	prefix: "/notifications",
+	prefix: "/profile",
 });
 
-/* 
-    A basic Notification model will look similar to:
-    await modelNotification.create({
-        detail: "Review the attached article for publication",
-        status: "unread",
-        meta: {
-          author: {
-            uuid: ctx.state.user.uuid,
-            role: ctx.state.user.role,
-            level: ctx.state.user.level,
-            name: ctx.state.user.firstName,
-          },
-          target: { type: "UserGroup", level: "admin or above", role: "4+" } | 
-          target: { type: "User", 
-                    uuid: ctx.state.user.uuid,
-                    //type: "UserGroup",
-                    level: "admin or above",
-                    role: '4,5' | 4 //single role or list of roles
-                    //operator: ">=", //Consider if an Operator approach can be used for list of roles. Currently not in use
-                },
-          content: {
-            path: article.alias,
-            title: article.title,
-          },
-        },
-      });
- */
-//view all notification by props
+
+//view all profile by props
 router.get(
 	"/",
 	async (ctx, next) => {
@@ -170,4 +143,4 @@ router.get("/:uuid/read", async (ctx) => {
 	}
 });
 
-export { router as notificaions };
+export { router as patientHistory };

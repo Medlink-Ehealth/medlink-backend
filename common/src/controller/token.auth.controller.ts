@@ -1,10 +1,11 @@
 /* Middleware to manage auth session */
-
-import { decryptToken, encryptionToken, logger, Next, RouterExtendedDefaultContext, statusCodes } from "@medlink/common";
-
-import config from "../../app.config.js";
 import Redis from "ioredis";
 import { redis, Cache } from "../performance.controller.js";
+import { RouterExtendedDefaultContext } from "../middlewares/router.js";
+import { Next } from "../@types/utils.js";
+import { statusCodes } from "../constants/index.js";
+import { logger } from "../utils/logger.js";
+import { decryptToken, encryptionToken } from "../utils/index.js";
 
 /**
  * Process refresh token for access token.
@@ -14,9 +15,9 @@ import { redis, Cache } from "../performance.controller.js";
 const refreshAccessToken =
 	(
 		options: {
-			useCacheIfNoRedis?: boolean;
-			accessTokenLifetime?: number;
-			refreshTokenLifetime?: number | string;
+			useCacheIfNoRedis: boolean;
+			accessTokenLifetime: number;
+			refreshTokenLifetime: number | string;
 		} | void,
 	) =>
 	async (ctx: RouterExtendedDefaultContext, next?: Next) => {
@@ -24,7 +25,7 @@ const refreshAccessToken =
 
 		if (!storage) {
 			ctx.status = statusCodes.NOT_ACCEPTABLE;
-			ctx.message = "Using refresh token is not available on this server becuase no storage is setup to handle this";
+			ctx.message = "Using refresh token is not available on this server because no storage is setup to handle this";
 			return;
 		} else if (!ctx.sequelizeInstance) {
 			logger.error("refreshAccessToken Error: ", "No active ctx.sequelizeInstance to match request to!");
@@ -90,11 +91,7 @@ const refreshAccessToken =
 						? !isNaN(Number(options.accessTokenLifetime))
 							? options.accessTokenLifetime + "m"
 							: options.accessTokenLifetime
-						: config.authTokenLifetime
-							? !isNaN(Number(config.authTokenLifetime))
-								? config.authTokenLifetime + "m"
-								: config.authTokenLifetime.toString()
-							: "15m"
+						: "15m"
 				).toString();
 
 				const accessToken = await encryptionToken(data, {
@@ -102,13 +99,7 @@ const refreshAccessToken =
 				});
 				if (typeof accessToken === "string") responseBody["token"] = accessToken;
 
-				let refreshValidity = (
-					options && options.refreshTokenLifetime
-						? options.refreshTokenLifetime
-						: config.refreshTokenLifetime
-							? config.refreshTokenLifetime
-							: ""
-				).toString();
+				let refreshValidity = (options && options.refreshTokenLifetime ? options.refreshTokenLifetime : "").toString();
 
 				if (refreshValidity) {
 					refreshValidity = !isNaN(Number(refreshValidity)) ? refreshValidity + "d" : refreshValidity;

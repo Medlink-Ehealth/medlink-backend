@@ -1,5 +1,5 @@
 import "dotenv/config";
-import { logger } from "@medlink/common";
+import { logger } from "./src/utils/logger.js";
 const envs = process.env;
 
 export const redisConfig = (): { port: number; host: string } | null => {

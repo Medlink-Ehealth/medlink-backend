@@ -1,6 +1,7 @@
 import Redis from "ioredis";
-import { InMemoryCache, logger } from "@medlink/common";
+import { logger } from "./utils/logger.js";
 import { redisConfig } from "../redis.config.js";
+import { InMemoryCache } from "./server.js";
 
 // Setup extra starup related performanc features
 const redisConnect = redisConfig();
