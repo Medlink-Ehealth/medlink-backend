@@ -1,8 +1,9 @@
 import type { PlatformConfig } from "./platform.config.js";
-import { AdminStatic } from "../models/accounts/Admin.model.js";
-import { ClientStatic } from "../models/accounts/Client.model.js";
+import type { AdminStatic } from "../models/accounts/Admin.model.js";
+import type { ClientStatic } from "../models/accounts/Client.model.js";
 
 export { PlatformConfig };
 export * from "./utils.js";
-export { AdminStatic };
-export { ClientStatic };
+export * from "./Models.js";
+export type { AdminStatic };
+export type { ClientStatic };

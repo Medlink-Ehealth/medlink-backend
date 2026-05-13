@@ -15,7 +15,7 @@
 		"app.config.ts",
 		"app.swagger.ts",
 		"src/**/*.ts"
-	],
+, "../../common/src/@types/Models.ts"	],
 	"exclude": ["node_modules", "dist", "**/*.test.ts", "**/*.spec.ts"],
 	"references": [{ "path": "../../common" }]
 }

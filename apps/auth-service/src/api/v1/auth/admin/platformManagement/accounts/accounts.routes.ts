@@ -19,7 +19,7 @@ import {
 import { AdminStatic, ClientStatic } from "@medlink/types";
 import validator from "validator";
 import { ModelStatic, Sequelize } from "sequelize";
-import { AdminUser, ClientUser } from "../../../../../../@types/Models.js";
+import { AdminUser, ClientUser } from "../../../../../../../../../common/src/@types/Models.js";
 import { createNewAccount } from "../../../../../../controllers/createNewAccount.controller.js";
 import { adminFormValidator } from "../../../../../../validators/adminFormValidator.js";
 import { clientFormValidator } from "../../../../../../validators/clientFormValidator.js";
