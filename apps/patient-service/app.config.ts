@@ -1,4 +1,4 @@
-import { PlatformConfig } from "@medlink/common/config";
+import { PlatformConfig } from "@medlink/config";
 
 /* Use this to overwrite project level configurations if needed */
 const config: typeof PlatformConfig = {

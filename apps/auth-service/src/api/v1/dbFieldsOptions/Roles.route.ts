@@ -1,5 +1,4 @@
-import { Router, statusCodes } from "@medlink/common";
-import { AdminRole } from "../../../models/accounts/index.js";
+import { Router, statusCodes, AdminRole } from "@medlink/common";
 
 const router = Router({
 	prefix: "/roles",

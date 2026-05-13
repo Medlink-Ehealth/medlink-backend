@@ -18,7 +18,7 @@ import { Op } from "sequelize";
 import { clientFormValidator } from "../../../validators/clientFormValidator.js";
 import config from "../../../../app.config.js";
 import { createNewAccount } from "../../../controllers/createNewAccount.controller.js";
-import { Client, UserSetting } from "../../../models/accounts/index.js";
+import { Client, UserSetting } from "../../../../../../common/src/models/accounts/index.js";
 import { userCombosFormValidator } from "../../../validators/userCombosFormValidator.js";
 import { ClientUser } from "../../../@types/index.js";
 import { NonAdminUsersController } from "../../../controllers/NonAdminUsers.addon.userController.js";

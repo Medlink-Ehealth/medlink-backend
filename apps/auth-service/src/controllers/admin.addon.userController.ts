@@ -1,5 +1,5 @@
 import { AppContext, defaultMailTemplate, logger, mailSender, otpLinkGenerator, statusCodes } from "@medlink/common";
-import { Admin } from "../models/accounts/Admin.model.js";
+import { Admin } from "../../../../common/src/models/accounts/Admin.model.js";
 
 // reset account password custom-handled for email customisation purposes
 const resetPassword =

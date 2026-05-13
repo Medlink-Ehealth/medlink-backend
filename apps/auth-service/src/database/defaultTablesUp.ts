@@ -1,5 +1,4 @@
-import { hashPassword, logger, sequelizeInstances } from "@medlink/common";
-import { Admin } from "../models/accounts/Admin.model.js";
+import { hashPassword, logger, sequelizeInstances, Admin } from "@medlink/common";
 
 const instances = Object.values(sequelizeInstances);
 

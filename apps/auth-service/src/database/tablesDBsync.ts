@@ -1,10 +1,18 @@
-import { sequelizeInstances, getOffsetTimestamp, logger, Notification, UserAccessTimestamp, UserSecurity, OTP } from "@medlink/common";
+import {
+	sequelizeInstances,
+	getOffsetTimestamp,
+	logger,
+	Notification,
+	UserAccessTimestamp,
+	UserSecurity,
+	OTP,
+	Admin,
+	AdminRole,
+	UserSetting,
+	Client,
+} from "@medlink/common";
 
-import { Admin } from "../models/accounts/Admin.model.js";
 import { Sequelize } from "sequelize";
-import { AdminRole } from "../models/accounts/AdminRole.model.js";
-import { UserSetting } from "../models/accounts/UserSetting.model.js";
-import { Client } from "../models/accounts/Client.model.js";
 
 const instances = Object.values(sequelizeInstances);
 
@@ -58,7 +66,6 @@ for (const sequelize of instances) {
 	await modelsSync(sequelize);
 }
 process.exit();
-
 
 /* 
 {

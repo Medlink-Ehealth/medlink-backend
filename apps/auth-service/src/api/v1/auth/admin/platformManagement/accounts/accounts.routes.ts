@@ -11,13 +11,14 @@ import {
 	requestParser,
 	statusCodes,
 	throwError,
+	Admin,
+	AdminRole,
+	Client,
+	UserSetting,
 } from "@medlink/common";
-
+import { AdminStatic, ClientStatic } from "@medlink/types";
 import validator from "validator";
-import { Admin, AdminRole, Client, UserSetting } from "../../../../../../models/accounts/index.js";
 import { ModelStatic, Sequelize } from "sequelize";
-import { AdminStatic } from "../../../../../../models/accounts/Admin.model.js";
-import { ClientStatic } from "../../../../../../models/accounts/Client.model.js";
 import { AdminUser, ClientUser } from "../../../../../../@types/Models.js";
 import { createNewAccount } from "../../../../../../controllers/createNewAccount.controller.js";
 import { adminFormValidator } from "../../../../../../validators/adminFormValidator.js";
@@ -259,7 +260,7 @@ router.get(
 							groupUsersByType[key] = usersGroup.map((account) => {
 								const thisAccount = account.toJSON() as AdminUser;
 								if (UsersAccessTimestamps[thisAccount.uuid]) {
-									thisAccount['access' as 'firstName'] = UsersAccessTimestamps[thisAccount.uuid] as any;
+									thisAccount["access" as "firstName"] = UsersAccessTimestamps[thisAccount.uuid] as any;
 								}
 								if (UserRoles && UserRoles.length)
 									for (let i = 0; i < UserRoles.length; i++) {
@@ -573,7 +574,7 @@ router.post(
 				await adminFormValidator.createAccount(ctx, next);
 			} else if (type === "Client") {
 				await clientFormValidator.createAccount(ctx, next);
-			}  else {
+			} else {
 				ctx.status = statusCodes.BAD_REQUEST;
 				ctx.message =
 					"Account type missing. Define as either 'admin', 'client' or 'delivery_partner' either in the endpoint or as a URL query like type=admin";

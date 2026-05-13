@@ -1,5 +1,5 @@
 import { AppContext, defaultMailTemplate, logger, mailSender, otpLinkGenerator, statusCodes } from "@medlink/common";
-import { Client, ClientStatic } from "../models/accounts/Client.model.js";
+import { Client, ClientStatic } from "../../../../common/src/models/accounts/Client.model.js";
 
 const resetPassword = async (ctx: AppContext) => {
 	const { email } = ctx.request.body;
