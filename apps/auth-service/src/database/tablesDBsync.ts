@@ -9,7 +9,7 @@ import {
 	Admin,
 	AdminRole,
 	UserSetting,
-	Client,
+	Patient,
 } from "@medlink/common";
 
 import { Sequelize } from "sequelize";
@@ -42,7 +42,7 @@ const modelsSync = async (sequelize: Sequelize) => {
 		await UserSecurity(sequelize).sync({ alter: true });
 
 		await Admin(sequelize).sync({ alter: true });
-		await Client(sequelize).sync({ alter: true });
+		await Patient(sequelize).sync({ alter: true });
 
 		await AdminRole(sequelize).sync({ force: true });
 		await OTP(sequelize).sync({ alter: true });

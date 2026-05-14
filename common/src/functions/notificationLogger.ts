@@ -20,7 +20,7 @@ const notificationLogger = async ({
 }: {
 	detail: string;
 	meta: {
-		target: "Client" | "Admin" | "DeliveryPartner"; //string;
+		target: "Patient" | "Admin" ; //string;
 		uuid: `${string}-${string}-${string}-${string}-${string}` | "xxx-xxxx-xxxxx-xxxxxx" | "self";
 		filter?: { [filterLabel: string]: string | boolean | number | string[] | number[] };
 	};
@@ -68,7 +68,7 @@ const notificationLogger = async ({
 			// initiate socket events
 			/* 
 				Notifications possible actions
-						new => to send a new notification to client
+						new => to send a new notification to patient
 						read => update state of notification to read
 
 						target: "Admin",
@@ -84,7 +84,7 @@ const notificationLogger = async ({
 			// Generalised notification by system events, dependent on context
 			if (ctx) {
 				if (meta.uuid === "xxx-xxxx-xxxxx-xxxxxx") {
-					// when no specific filter exists, send to all target connect clients
+					// when no specific filter exists, send to all target connect patients
 					if (!meta.filter) {
 						if (ctx.ioSocket) (ctx.ioSocket as Socket).to(meta.target).emit("notification", notification);
 					} else if (ctx.io) {

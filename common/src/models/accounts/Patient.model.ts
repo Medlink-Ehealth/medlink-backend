@@ -5,12 +5,12 @@ import { sequelizeInstances } from "@medlink/common";
 const instances = Object.values(sequelizeInstances);
 
 /**
- * Auth client user account
+ * Auth patient user account
  * @openapi
  * components:
  *   schemas:
- *     Client:
- *       description: Client/Customer type of user account
+ *     Patient:
+ *       description: Patient/Customer type of user account
  *       type: object
  *       properties:
  *         uuid:
@@ -25,13 +25,19 @@ const instances = Object.values(sequelizeInstances);
  *           type: string
  *           format: date-time
  *           readOnly: true
- *         avatar:
+ *         picture:
  *           type: string
  *           format: binary
  *         firstName:
  *           type: string
  *           nullable: false
  *         lastName:
+ *           type: string
+ *         dob:
+ *           type: string
+ *           readOnly: true
+ *           nullable: false
+ *         address:
  *           type: string
  *         phoneNumber:
  *           oneOf:
@@ -55,7 +61,7 @@ const instances = Object.values(sequelizeInstances);
  *           readOnly: true
  *         'type':
  *           type: string
- *           value: client
+ *           value: patient
  *           readOnly: true
  *
  *       required:
@@ -67,7 +73,7 @@ const PROTECTED_ATTRIBUTES = ["password", "email", "phoneNumber", "wallet" /* "s
 
 // bind model to each api env
 instances.map((sequelize) => {
-	class client extends Model {
+	class patient extends Model {
 		toJSON() {
 			// hide protected fields
 			const attributes = Object.assign({}, this.get());
@@ -77,7 +83,7 @@ instances.map((sequelize) => {
 			return attributes;
 		}
 	}
-	client.init(
+	patient.init(
 		{
 			uuid: {
 				type: DataTypes.UUID,
@@ -85,7 +91,7 @@ instances.map((sequelize) => {
 				unique: true,
 				primaryKey: true,
 			},
-			avatar: DataTypes.STRING,
+			picture: DataTypes.STRING,
 			firstName: {
 				type: DataTypes.STRING,
 				allowNull: false,
@@ -94,6 +100,15 @@ instances.map((sequelize) => {
 			lastName: {
 				type: DataTypes.STRING,
 				field: "last_name",
+			},
+			dob: {
+				type: DataTypes.DATE,
+				allowNull: false,
+				field: "date_of_birth",
+			},
+			address: {
+				type: DataTypes.STRING,
+				// allowNull: false,
 			},
 			phoneNumber: {
 				type: DataTypes.STRING,
@@ -127,7 +142,7 @@ instances.map((sequelize) => {
 			type: {
 				type: DataTypes.VIRTUAL,
 				get() {
-					return "client";
+					return "patient";
 				},
 				set() {
 					throw new Error("'type' is system managed. Do not set this");
@@ -161,35 +176,37 @@ instances.map((sequelize) => {
 					attributes: undefined,
 				},
 			},
-			tableName: "client_accounts",
+			tableName: "patient_accounts",
 			timestamps: true,
 			createdAt: "created",
 			updatedAt: "updated",
 			paranoid: true,
 			deletedAt: "deleted",
 			sequelize: sequelize,
-			modelName: "Client", // We need to choose the model name
+			modelName: "Patient", // We need to choose the model name
 		},
 	);
 
-	client.hasOne(UserSetting(sequelize), {
+	patient.hasOne(UserSetting(sequelize), {
 		as: "Setting",
-		scope: { user_type: "client" },
+		scope: { user_type: "patient" },
 		onDelete: "CASCADE",
 		onUpdate: "CASCADE",
 	});
-	UserSetting(sequelize).belongsTo(client, {
+	UserSetting(sequelize).belongsTo(patient, {
 		foreignKey: "user_uuid",
 		constraints: false,
 	});
 });
 
-export const Client = (db: Sequelize) => db.models["Client"] as ModelStatic<ClientStatic>;
+export const Patient = (db: Sequelize) => db.models["Patient"] as ModelStatic<PatientStatic>;
 type Attr = {
 	uuid: `${string}-${string}-${string}-${string}-${string}`;
-	avatar?: string;
 	firstName: string;
 	lastName?: string;
+	picture?: string;
+	dob: string;
+	address?: string;
 	phoneNumber?: string;
 	email: string;
 	password: string;
@@ -197,10 +214,10 @@ type Attr = {
 	state: boolean;
 	secured: boolean;
 	verified: boolean;
-	type: "client";
+	type: "patient";
 	created?: string;
 	updated?: string;
 };
-export interface ClientStatic extends Model<Attr>, Attr {
+export interface PatientStatic extends Model<Attr>, Attr {
 	toJSON(): Attr;
 }

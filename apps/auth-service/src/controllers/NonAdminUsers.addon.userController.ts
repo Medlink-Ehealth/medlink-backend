@@ -1,5 +1,5 @@
 import { AppContext, defaultMailTemplate, logger, mailSender, otpLinkGenerator, statusCodes } from "@medlink/common";
-import { Client, ClientStatic } from "../../../../common/src/models/accounts/Client.model.js";
+import { Patient, PatientStatic } from "../../../../common/src/models/accounts/Patient.model.js";
 
 const resetPassword = async (ctx: AppContext) => {
 	const { email } = ctx.request.body;
@@ -15,19 +15,19 @@ const resetPassword = async (ctx: AppContext) => {
 		return;
 	}
 	try {
-		const user: ClientStatic | null = await Client(ctx.sequelizeInstance).scope("management").findOne({
+		const user: PatientStatic | null = await Patient(ctx.sequelizeInstance).scope("management").findOne({
 			where: whereFilter,
 		});
 
-		if (user instanceof Client(ctx.sequelizeInstance)) {
+		if (user instanceof Patient(ctx.sequelizeInstance)) {
 			const OTPvalue = await otpLinkGenerator({
 				sequelize: ctx.sequelizeInstance,
 				expiry: "15m",
 				numberOfOTPChar: 4,
 				typeOfOTPChar: "numbers",
-				entityReference: "Client",
+				entityReference: "Patient",
 				queryIdentifier: email,
-				log: `Client user account password reset`,
+				log: `Patient user account password reset`,
 				//route: validationUrl ? validationUrl : ctx.path, // optional use current ctx route as dummy path
 				//siteAddress: siteAddress,
 				returnOTP: true,

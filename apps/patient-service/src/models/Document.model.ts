@@ -12,7 +12,7 @@ const instances = Object.values(sequelizeInstances);
  *       type: object
  *       properties:
  *         uuid:
- *           type: stringx
+ *           type: string
  *           format: uuid
  *           readOnly: true
  *         source:

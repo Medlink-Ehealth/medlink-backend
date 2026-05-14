@@ -15,6 +15,8 @@ const createAccount = async (ctx: AppContext, next: Next) => {
 	const schema = Joi.object().keys({
 		firstName: Joi.string().trim().min(3).max(50).required(),
 		lastName: Joi.any().allow(null, Joi.string().trim().allow("").max(50)),
+		dob: Joi.date().required(),
+		address: Joi.string(),
 		email: Joi.string().trim().email(),
 		/* password: Joi.string()
       .trim()
@@ -49,6 +51,8 @@ const updateAccount = async (ctx: AppContext, next: Next) => {
 		firstName: Joi.string().trim().min(3).max(50).required(),
 		lastName: Joi.any().allow(null, Joi.string().trim().allow("").max(50)),
 		phoneNumber: Joi.any().allow(null, Joi.string().trim().allow(""), Joi.number()), // placeholder
+		dob: Joi.date(),
+		address: Joi.string(),
 	});
 	await validatorHandler(ctx, next, schema);
 };
@@ -76,4 +80,4 @@ const changePassword = async (ctx: AppContext, next: Next) => {
 	await validatorHandler(ctx, next, schema);
 };
 
-export const clientFormValidator = { createAccount, updateAccount, changePassword };
+export const patientFormValidator = { createAccount, updateAccount, changePassword };

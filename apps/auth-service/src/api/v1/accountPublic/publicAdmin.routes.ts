@@ -1,4 +1,5 @@
 import {
+	AdminUser,
 	JsonObject,
 	Router,
 	authenticateEncryptedToken,
@@ -13,7 +14,6 @@ import {
 	statusCodes,
 } from "@medlink/common";
 import { adminFormValidator } from "../../../validators/adminFormValidator.js";
-import { AdminUser } from "../../../@types/index.js";
 import { UserSetting } from "../../../../../../common/src/models/accounts/UserSetting.model.js";
 import { adminController } from "../../../controllers/admin.addon.userController.js";
 import { Admin } from "../../../../../../common/src/models/accounts/Admin.model.js";

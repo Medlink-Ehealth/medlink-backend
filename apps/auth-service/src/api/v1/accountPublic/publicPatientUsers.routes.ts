@@ -15,12 +15,12 @@ import {
 } from "@medlink/common";
 import validator from "validator";
 import { Op } from "sequelize";
-import { clientFormValidator } from "../../../validators/clientFormValidator.js";
+import { patientFormValidator } from "../../../validators/patientFormValidator.js";
 import config from "../../../../app.config.js";
 import { createNewAccount } from "../../../controllers/createNewAccount.controller.js";
-import { Client, UserSetting } from "../../../../../../common/src/models/accounts/index.js";
+import { Patient, UserSetting } from "../../../../../../common/src/models/accounts/index.js";
 import { userCombosFormValidator } from "../../../validators/userCombosFormValidator.js";
-import { ClientUser } from "../../../@types/index.js";
+import { PatientUser } from "@medlink/types";
 import { NonAdminUsersController } from "../../../controllers/NonAdminUsers.addon.userController.js";
 import {
 	signAccountInLocal,
@@ -32,14 +32,14 @@ import {
 const router = Router();
 
 /**
- * New client user sign up route.
+ * New patient user sign up route.
  * @openapi
  * /register:
  *   post:
  *     tags:
- *       - Client Users
- *     summary: Client user register endpoint.
- *     description: "Endpoint only allows to create a Client new user account. If a client user tries to re-register within a 30 minutes period, a verification code is resent to the user, otherwise user is asked to sign in."
+ *       - Patient Users
+ *     summary: Patient user register endpoint.
+ *     description: "Endpoint only allows to create a Patient new user account. If a patient user tries to re-register within a 30 minutes period, a verification code is resent to the user, otherwise user is asked to sign in."
  *     requestBody:
  *       description: Request body can be available as json formated or FormData
  *       required: true
@@ -67,7 +67,7 @@ const router = Router();
  *                   - type: number
  *     responses:
  *       201:
- *         description: Returns created new client user data
+ *         description: Returns created new patient user data
  *         content:
  *           application/json: # Media type
  *             schema: # Must-have
@@ -78,7 +78,7 @@ const router = Router();
  *                 account:
  *                   description: account data
  *                   type: object
- *                   $ref: "#/components/schemas/Client"
+ *                   $ref: "#/components/schemas/Patient"
  *               example:
  *                 status: 201
  *                 account:
@@ -90,7 +90,7 @@ const router = Router();
  *                   email: emma-watson@gmail.com
  *                   state: true
  *                   verified: true
- *                   'type': 'client'
+ *                   'type': 'patient'
  *                   created: 2024-12-05T19:00:00.151Z
  *                   updated: 2024-12-05T19:00:00.151Z
  *       302:
@@ -125,7 +125,7 @@ const router = Router();
  *                   uuid: "df0921a1-261a-40ba-915c-8465d258892d"
  *                   firstName: Emma
  *                   verified: false
- *                   'type': 'client'
+ *                   'type': 'patient'
  *                   created: 2024-12-05T19:00:00.151Z
  *       400:
  *         description: Either email or phone number must be provided for a user registration
@@ -139,22 +139,22 @@ const router = Router();
  *         description: "Oops! Apologies we are currently unable to sign you up but we are working on it. Media type => text/plain"
  */
 
-// Create a client new account => User sign up
+// Create a patient new account => User sign up
 router.post(
 	"/register",
 	requestParser({ multipart: true }),
 	async (ctx, next) => {
 		// export userType which is needed in both checkAccount && createNewAccount middleware
-		ctx.state.userType = "Client";
+		ctx.state.userType = "Patient";
 		await next();
 	},
-	clientFormValidator.createAccount,
+	patientFormValidator.createAccount,
 	checkAccount(false),
 	async (ctx, next) => {
 		// console.log("ctx.state.error", ctx.state.error);
 		// because of the way multitenancy is defined when instantiating db connetcivity, we need to check if sequelize instance existif
 		if (!ctx.sequelizeInstance) {
-			logger.error("No active sequelizeInstance detected, and unable to run DB related entries in publicClientUsers route");
+			logger.error("No active sequelizeInstance detected, and unable to run DB related entries in publicPatientUsers route");
 			return ctx.throw("Oops! Server error");
 		}
 		if (ctx.state.error) {
@@ -167,7 +167,7 @@ router.post(
 					: ctx.request.body.email
 						? { email: ctx.request.body.email }
 						: { phoneNumber: ctx.request.body.phoneNumber };
-				const checkVerified = await Client(ctx.sequelizeInstance)
+				const checkVerified = await Patient(ctx.sequelizeInstance)
 					.scope("management")
 					.findOne({
 						where: {
@@ -184,7 +184,7 @@ router.post(
 
 					const OTPvalue = (await otpLinkGenerator({
 						sequelize: ctx.sequelizeInstance!,
-						entityReference: "Client",
+						entityReference: "Patient",
 						typeOfOTPChar: "numbers",
 						numberOfOTPChar: 4,
 						queryIdentifier: (identifier === 2
@@ -192,7 +192,7 @@ router.post(
 							: identifier === 1
 								? checkVerified.dataValues.email
 								: checkVerified.dataValues.phoneNumber) as string | string[],
-						log: `Client: Unverified new account`,
+						log: `Patient: Unverified new account`,
 						expiry: "15m",
 						//route: "/verify/newuser", //available at dir system/otp/newUserVerify.routes
 						returnOTP: true,
@@ -216,7 +216,7 @@ router.post(
 								content: {
 									text: `Hello ${checkVerified.dataValues.firstName}`,
 									html: newUserAccountCreationTemplate({
-										//verificationLink: verificationLink + `&userType=Client`, //insert user account type as query to verification link
+										//verificationLink: verificationLink + `&userType=Patient`, //insert user account type as query to verification link
 										otp: OTPvalue,
 										greetings: "Welcome to the family",
 										name: checkVerified.dataValues.firstName,
@@ -262,7 +262,7 @@ router.post(
 		// console.log("ctx.state.newUser", ctx.state.newUser);
 		if (ctx.state.newUser) {
 			// create an associated user settings
-			await UserSetting(ctx.sequelizeInstance!).create({ user_uuid: ctx.state.newUser.dataValues.uuid, user_type: "client" });
+			await UserSetting(ctx.sequelizeInstance!).create({ user_uuid: ctx.state.newUser.dataValues.uuid, user_type: "patient" });
 
 			const profileData = {
 				status: statusCodes.CREATED,
@@ -271,7 +271,7 @@ router.post(
 			};
 			notificationLogger({
 				ctx,
-				detail: `New client user account signed up: ${profileData.account.firstName} (${profileData.account.email})`,
+				detail: `New patient user account signed up: ${profileData.account.firstName} (${profileData.account.email})`,
 				meta: {
 					target: "Admin",
 					uuid: "xxx-xxxx-xxxxx-xxxxxx",
@@ -297,8 +297,8 @@ router.post(
  * /login:
  *   post:
  *     tags:
- *       - Client Users
- *     summary: Sign in a client user account
+ *       - Patient Users
+ *     summary: Sign in a patient user account
  *     description: Make a post request with the user credential to server to log in
  *     requestBody:
  *       description: Request body can be available as json formated or FormData
@@ -335,7 +335,7 @@ router.post(
  *                   type: object
  *                   description: User data
  *                   anyOf:
- *                     - $ref: "#/components/schemas/Client"
+ *                     - $ref: "#/components/schemas/Patient"
  *               example:
  *                 status: 200
  *                 token: 64nc576t7r98ct7n6578wn90cmu8r99id97ty7nc7w09
@@ -350,7 +350,7 @@ router.post(
  *                   state: true
  *                   secured: false
  *                   verified: true
- *                   type: 'client'
+ *                   type: 'patient'
  *       301:
  *         description: "Requesting authenticator code with the attached 'token'. Valid for 15 minutes"
  *         content:
@@ -392,7 +392,7 @@ router.post(
  *                     uuid: "df0921a1-261a-40ba-915c-8465d258892d"
  *                     firstName: Adelaolu
  *                     verified: false
- *                     'type': client
+ *                     'type': patient
  *       404:
  *         description: Oops! Incorrect email or password
  *       503:
@@ -407,7 +407,7 @@ router.post(
  * /login/2fa:
  *   post:
  *     tags:
- *       - Client Users
+ *       - Patient Users
  *     summary: "Account that has 'secured' enabled will require 2FA"
  *     description: An account can optionally opt to enable 2FA. When this is the case, the '/sign-in' endpoint would instead return a token with a redirect status. Send the token as payload with the 2FA code from authenticator to this endpoint to process sign-in for 2fa enabled account
  *     requestBody:
@@ -439,7 +439,7 @@ router.post(
  *                   type: object
  *                   description: User data
  *                   anyOf:
- *                     - $ref: "#/components/schemas/Client"
+ *                     - $ref: "#/components/schemas/Patient"
  *               example:
  *                 status: 200
  *                 token: 64nc576t7r98ct7n6578wn90cmu8r99id97ty7nc7w09
@@ -454,7 +454,7 @@ router.post(
  *                   state: true
  *                   secured: false
  *                   verified: true
- *                   type: 'client'
+ *                   type: 'patient'
  *       403:
  *         description: Returned data when account is pending verification
  *         content:
@@ -487,7 +487,7 @@ router.post(
  *                   uuid: "df0921a1-261a-40ba-915c-8465d258892d"
  *                   firstName: Emma
  *                   verified: false
- *                   'type': 'client'
+ *                   'type': 'patient'
  *                   created: 2024-12-05T19:00:00.151Z
  *       404:
  *         description: Please provide the code from your authenticator app to continue
@@ -528,7 +528,7 @@ router.post(
 		//console.log("ctx.body", ctx.body);
 		//console.log('ctx.ioSocket', ctx.ioSocket)
 		//lets ensure data is available
-		type body = { account: ClientUser; status: 200 };
+		type body = { account: PatientUser; status: 200 };
 		if (!ctx.body || (ctx.body && (ctx.body as body).status !== 200)) return;
 
 		const user = (ctx.body as body)["account"];
@@ -544,7 +544,7 @@ router.post(
 							ctx,
 							detail: `You signed into your account`,
 							meta: {
-								target: "Client",
+								target: "Patient",
 								uuid: "self", //user.uuid,
 							},
 							sendMail: settings.dataValues.sendNotificationsBy.includes("email"),
@@ -558,11 +558,11 @@ router.post(
 
 			const OTPvalueOrUrl = (await otpLinkGenerator({
 				sequelize: ctx.sequelizeInstance!,
-				entityReference: "Client",
+				entityReference: "Patient",
 				numberOfOTPChar: 4,
 				typeOfOTPChar: "numbers",
 				queryIdentifier: signinId,
-				log: "Client: Verification code sent for an unverified user",
+				log: "Patient: Verification code sent for an unverified user",
 				expiry: "15m",
 				route: undefined, //available at dir system/otp/newUserVerify.routes
 				returnOTP: true,
@@ -616,7 +616,7 @@ router.post(
 	},
 	signAccountInLocal({
 		userRole: false,
-		userType: "Client",
+		userType: "Patient",
 		signInType: (ctx) => ctx.request.body.email || ctx.request.body.phoneNumber,
 		accessTokenLifetime: (ctx) => ctx.request.body.rememberMe,
 	}),
@@ -628,7 +628,7 @@ router.post(
  * /reset-password:
  *   post:
  *     tags:
- *       - Client Users
+ *       - Patient Users
  *     summary: Reset a user password
  *     description: "Make a post request with the user email to server to start the password reset process. This send an OTP code to the user email. The code should then be used on '/v1/set-new-password' endpoint to complete the process. Resubmit to initiate OTP resend; but keep in mind that a 60 seconds retry policy is put in place to avoid abuse!"
  *     requestBody:
@@ -694,7 +694,7 @@ router.post(
  * /set-new-password:
  *   post:
  *     tags:
- *       - Client Users
+ *       - Patient Users
  *     summary: Confirm user password reset
  *     description: Call endpoint to complete password reset process by providing new password
  *     parameters:
@@ -788,7 +788,7 @@ router.post(
 
 			const whereFilter = { [emailOrPhone.includes("@") ? "email" : "phoneNumber"]: emailOrPhone };
 
-			const user = await Client(ctx.sequelizeInstance!).update({ password: hashedPassword }, { where: whereFilter });
+			const user = await Patient(ctx.sequelizeInstance!).update({ password: hashedPassword }, { where: whereFilter });
 
 			if (user) {
 				ctx.status = statusCodes.OK;
@@ -837,4 +837,4 @@ router.get(
 	}),
 );
 
-export { router as publicClientUsers };
+export { router as publicPatientUsers };

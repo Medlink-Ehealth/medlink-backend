@@ -1,146 +1,196 @@
-import { Op } from "sequelize";
-import { dbQuerier, Notification, Router, statusCodes } from "@medlink/common";
+import { mediaUpload, requestParser, Router, statusCodes, UserSecurity, Patient } from "@medlink/common";
+import { patientProfileUpdate } from "../../validators/patientProfileUpdate.js";
+import { updatePatientProfile } from "../../controllers/PatientProfile.controller.js";
 
-const router = Router({
-	prefix: "/profile",
+const router = Router("profile");
+
+router.use(async (ctx, next) => {
+	if (ctx.method.toLowerCase() !== "get" && !ctx.state.user.state) {
+		ctx.status = statusCodes.FORBIDDEN;
+		return (ctx.body = {
+			statusText: "Account is inactive. Please active you account",
+		});
+	}
+	await next();
 });
 
+/**
+ * Access signed-in user data. This includes the raw scope on the User model
+ * @openapi
+ * /patients/profile:
+ *   get:
+ *     tags:
+ *       - Current signed-in patient user self management
+ *     summary: "Fetch signed-in user data. This is practically the same as '/auth/me' endpoint available on the auth-service"
+ *     description: "Access signed-in patient user data. This includes the raw schema with sensitive fields like email and phone number that are not naturally available in user access token. Access restricted to the owning user"
+ *     security:
+ *       - Token: []
+ *     responses:
+ *       200:
+ *         description: Returns patient user data
+ *         content:
+ *           application/json: # Media type
+ *             schema: # Must-have
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: number
+ *                 account:
+ *                   description: "account data with security settings attached in 'auth_features' key"
+ *                   type: object
+ *                   $ref: "#/components/schemas/Patient"
+ *               example:
+ *                 status: 200
+ *                 account:
+ *                   uuid: "df0921a1-261a-40ba-915c-8465d258892d"
+ *                   picture: "/picture.jpg"
+ *                   firstName: Emma
+ *                   lastName: Emma
+ *                   gender: Male
+ *                   nationality: Nigeria
+ *                   dob: 2024-12-05
+ *                   address: No 2, Egbeda, Lagos
+ *                   phoneNumber: 07012345678
+ *                   email: emma-watson@gmail.com
+ *                   state: true
+ *                   verified: true
+ *                   auth_features:
+ *                     2fa:
+ *                       verified: false
+ *                     recovery_emails:
+ *                       - verified: true
+ *                         email: emma-watson2025@gmail.com
+ *                   'type': 'patient'
+ *                   created: 2024-12-05T19:00:00.151Z
+ *                   updated: 2024-12-05T19:00:00.151Z
+ *       401:
+ *         description: Unauthorised response
+ *       5xx:
+ *         description: "Oops! A server error occcurred. Media type => text/plain"
+ */
 
-//view all profile by props
-router.get(
-	"/",
-	async (ctx, next) => {
-		//console.log("ctx.url:", ctx.url);
-		//console.log("ctx.path:", ctx.path);
-		//When no filter exists
-		if (ctx.path === ctx.url) {
-			ctx.url = ctx.url + "?sort[created=DESC]&page[limit=10]";
+router.get("/", async (ctx) => {
+	if (ctx.isAuthenticated()) {
+		// lets fetch management scope for user that includes allowable sensitive data
+		const user = await Patient(ctx.sequelizeInstance!).scope("management").findByPk(ctx.state.user.uuid);
+		if (!user) {
+			ctx.status = statusCodes.SERVICE_UNAVAILABLE;
+			ctx.message = "Sorry there was an issue retrieving user information";
+			return;
 		}
-		await next();
+		const security = await UserSecurity(ctx.sequelizeInstance!).findByPk(ctx.state.user.uuid);
+
+		if (security instanceof UserSecurity(ctx.sequelizeInstance!)) {
+			ctx.state.user["auth_features"] = security.toJSON();
+			delete ctx.state.user["auth_features"]["user_uuid"];
+		} else ctx.state.user["auth_features"] = null;
+		ctx.status = statusCodes.OK;
+		return (ctx.body = {
+			status: statusCodes.OK,
+			account: { ...user.dataValues, auth_features: ctx.state.user["auth_features"] },
+		});
+	}
+	ctx.status = statusCodes.UNAUTHORIZED;
+	ctx.message = "Unauthorised!";
+	return;
+});
+
+/**
+ * Update a user account
+ * @openapi
+ * /patients/profile:
+ *   patch:
+ *     tags:
+ *       - Current signed-in patient user self management
+ *     summary: Update signed-in patient user account information
+ *     description: "Note that this only allows for basic user data and picture update. Modification to sensitive user information like Email and Phone Number has a dedicated endpoint on the auth-service. Also, like on auth-service it's impossible to update user UUID, and the rest here are simply replica of '/auth/update'"
+ *     security:
+ *       - Token: []
+ *     requestBody:
+ *       description: Request body can be available as json formated or FormData
+ *       required: true
+ *       content:
+ *         multipart/form-data: # Media type
+ *           schema:
+ *             type: object
+ *             properties:
+ *               avatar:
+ *                 type: string
+ *                 format: file
+ *               firstName:
+ *                 type: string
+ *               lastName:
+ *                 type: string
+ *               dob:
+ *                 type: string
+ *                 format: date
+ *               address:
+ *                 type: string
+ *               gender:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Returns updated user data
+ *         content:
+ *           application/json: # Media type
+ *             schema: # Must-have
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: number
+ *                 statusText:
+ *                   type: string
+ *                 account:
+ *                   description: account data
+ *                   type: object
+ *                   $ref: "#/components/schemas/Patient"
+ *               example:
+ *                 status: 200
+ *                 account:
+ *                   uuid: "df0921a1-261a-40ba-915c-8465d258892d"
+ *                   avatar: "/picture.jpg"
+ *                   firstName: Emma
+ *                   lastName: Emma
+ *                   gender: Male
+ *                   dob: 2024-12-05
+ *                   phoneNumber: 07012345678
+ *                   email: emma-watson@gmail.com
+ *                   state: true
+ *                   verified: true
+ *                   'type': 'patient'
+ *                   created: 2024-12-05T19:00:00.151Z
+ *                   updated: 2024-12-05T19:00:00.151Z
+ *       304:
+ *         description: Unable to update account data
+ *       406:
+ *         description: Validate not acceptable error. Media type => text/plain
+ *       5xx:
+ *         description: "Oops! Server error. Media type => text/plain"
+ */
+router.patch(
+	"/me/update",
+	requestParser({ multipart: true }),
+	patientProfileUpdate,
+	mediaUpload({ mediaPath: "private" }),
+	async (ctx, next) => {
+		// user email and phone should require special endpoints that ensures users verify such update. This should already throw validation error in validator middleware but leaving this here just in case
+		if (ctx.request.body.email) delete ctx.request.body.email;
+		if (ctx.request.body.phoneNumber) delete ctx.request.body.phoneNumber;
+		//call next
+		await updatePatientProfile({ userType: "Patient" })(ctx, next);
 	},
-	dbQuerier({ ignoreStateFiltration: true }),
-	async (ctx) => {
-		//console.log("ctx.state.dbQuerier:", ctx.state.dbQuerier);
-		if (ctx.state.dbQuerier) {
-			const queryFilter = () => {
-				//reserve existing meta if it exists
-				let reservedMeta;
-				if (!ctx.state.dbQuerier.where) ctx.state.dbQuerier.where = { meta: {} };
-				else if (!ctx.state.dbQuerier.where.meta) ctx.state.dbQuerier.where["meta"] = {};
-				else reservedMeta = ctx.state.dbQuerier.where.meta;
-
-				//general user-specific notifications
-				ctx.state.dbQuerier.where.meta = {
-					[Op.and]: [{ [Op.contains]: { target: { type: "User" } } }, { [Op.contains]: { target: { uuid: ctx.state.user.uuid } } }],
-				};
-				//Admin/roles-specific notifications
-				if (ctx.state.user.role)
-					ctx.state.dbQuerier.where.meta = {
-						[Op.or]: [
-							ctx.state.dbQuerier.where.meta,
-							{
-								[Op.and]: [
-									{ [Op.contains]: { target: { type: "UserGroup" } } },
-									{
-										[Op.or]: [
-											{
-												target: {
-													role: {
-														[Op.iLike]: "%" + ctx.state.user.role.toString(),
-													},
-												},
-											}, //Contains role in a list of roles
-											{
-												[Op.contains]: {
-													target: { role: ctx.state.user.role },
-												},
-											}, //Current roles only
-										],
-									},
-								],
-							},
-						],
-					};
-				if (reservedMeta)
-					ctx.state.dbQuerier.where.meta = {
-						...ctx.state.dbQuerier.where.meta,
-						...reservedMeta,
-					};
-				return;
-			};
-
-			//When no model target exists, filter to currently logged user
-			if (!ctx.state.dbQuerier.where || (ctx.state.dbQuerier.where && !ctx.state.dbQuerier.where.meta)) {
-				queryFilter();
-			}
-			//Only fetch notification if at least a Target FILTER exists
-			if (ctx.state.dbQuerier.where.meta && typeof ctx.state.dbQuerier.where.meta === "object") {
-				if (!ctx.state.dbQuerier.limit)
-					//control the query limit if none is defined
-					ctx.state.dbQuerier.limit = 20;
-
-				//console.log("ctx.state.dbQuerier @@:", ctx.state.dbQuerier);
-				const notifications = await Notification(ctx.sequelizeInstance!).findAll(ctx.state.dbQuerier);
-				//console.log("notifications:", notifications);
-				if (!notifications) {
-					ctx.status = statusCodes.NOT_FOUND;
-					return (ctx.body = null);
-				}
-				ctx.status = statusCodes.OK;
-				ctx.body = {
-					status: statusCodes.OK,
-					data: notifications,
-				};
-			} else {
-				ctx.status = statusCodes.FORBIDDEN;
-				ctx.message = "Define at least a META filter to fetch notifications. Or leave out META filter to filter to server default";
-			}
+	(ctx) => {
+		if (ctx.state.updatedUser) {
+			const thisUser = { ...ctx.state.user, ...ctx.state.updatedUser };
+			//ctx.logIn(thisUser);
+			ctx.status = statusCodes.OK;
+			return (ctx.body = {
+				status: statusCodes.OK,
+				statusText: "Successful",
+				account: thisUser,
+			});
 		}
 	},
 );
 
-//get single notification
-router.get("/:uuid", async (ctx) => {
-	//Only the highest user role besides the DEV role should be able to see a notification
-	const notification = await ctx.sequelizeInstance!.transaction(async (t) => {
-		const highestRole = await AdminRole(ctx.sequelizeInstance!).findOne({
-			order: [["level", "DESC"]],
-			offset: 1,
-			transaction: t,
-		});
-		//console.log("highestRole", highestRole);
-		if (highestRole && ctx.state.user.role >= highestRole.dataValues.level) {
-			return await Notification(ctx.sequelizeInstance!).findByPk(ctx.params.uuid, { transaction: t });
-		} else return false;
-	});
-	if (notification) {
-		ctx.status = statusCodes.OK;
-		ctx.body = {
-			status: statusCodes.OK,
-			data: notification.toJSON(),
-		};
-	} else {
-		ctx.status = statusCodes.NOT_FOUND;
-		ctx.message = "Oops. We are unsure you have the permission to view the notification you are looking for!";
-		return;
-	}
-});
-
-//update single notification status
-router.get("/:uuid/read", async (ctx) => {
-	//Only the highest user role besides the DEV role should be able to see a notification
-	const notification = await Notification(ctx.sequelizeInstance!).update({ status: "read" }, { where: { uuid: ctx.params.uuid } });
-
-	if (notification) {
-		ctx.status = statusCodes.OK;
-		ctx.body = {
-			status: statusCodes.OK,
-		};
-	} else {
-		ctx.status = statusCodes.NOT_FOUND;
-		ctx.message = "Oops. We are unsure you have the permission to view the notification you are looking for!";
-		return;
-	}
-});
-
-export { router as patientProfile };
+export { router as CurrentUserSignedInPatientProfile };

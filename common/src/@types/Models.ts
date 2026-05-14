@@ -14,7 +14,7 @@ export interface AdminUser {
 	updated?: string;
 }
 
-export interface ClientUser {
+export interface PatientUser {
 	uuid: string;
 	avatar?: string;
 	firstName: string;
@@ -23,7 +23,7 @@ export interface ClientUser {
 	email: string;
 	state?: boolean;
 	verified?: boolean;
-	type: "client";
+	type: "patient";
 	created?: string;
 	updated?: string;
 }

@@ -1,5 +1,5 @@
 import { Next } from "koa";
-import { Client } from "../../../../common/src/models/accounts/Client.model.js";
+import { Patient } from "../../../../common/src/models/accounts/Patient.model.js";
 import { Op } from "sequelize";
 import {
 	AppContext,
@@ -16,7 +16,7 @@ import config from "../../app.config.js";
 /**
  *  @description Middleware to create a user for platform, sending mail with verification link. Making this dynamic enough to be usable across any user account type
  *  @params Request body must exist, containing necessary info for account creation
- *  @returns {Admin|Client}
+ *  @returns {Admin|Patient}
  */
 export const createNewAccount = (options?: { verificationExpiry: string | number }) => async (ctx: AppContext, next: Next) => {
 	if (!ctx.state.userType) {
@@ -38,7 +38,7 @@ export const createNewAccount = (options?: { verificationExpiry: string | number
 	}
 
 	try {
-		if (ctx.state.userType === "Client") {
+		if (ctx.state.userType === "Patient") {
 			const whereFilter = ctx.request.body.email ? { email: ctx.request.body.email } : null;
 			if (!whereFilter) {
 				ctx.state.error = {
@@ -48,12 +48,12 @@ export const createNewAccount = (options?: { verificationExpiry: string | number
 				return await next();
 			}
 
-			const checkIfInClient = await Client(ctx.sequelizeInstance).findOne({ where: whereFilter });
-			if (checkIfInClient) {
+			const checkIfInPatient = await Patient(ctx.sequelizeInstance).findOne({ where: whereFilter });
+			if (checkIfInPatient) {
 				ctx.state.error = {
 					code: statusCodes.FORBIDDEN,
 					message:
-						"Sorry, currently unable to create this account. This email is currently registered as a Client User account on the platform",
+						"Sorry, currently unable to create this account. This email is currently registered as a Patient User account on the platform",
 				};
 				return await next();
 			}
