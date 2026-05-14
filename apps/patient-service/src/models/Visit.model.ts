@@ -1,4 +1,4 @@
-import { sequelizeInstances } from "@medlink/common";
+import { Patient, sequelizeInstances } from "@medlink/common";
 import { DataTypes, Model, Sequelize } from "sequelize";
 
 const instances = Object.values(sequelizeInstances);
@@ -41,6 +41,15 @@ instances.map((sequelize) => {
 				allowNull: false,
 				field: "comment_by", // use to keep record of the doctor/personnel of person that entered this record
 			},
+			type: {
+				type: DataTypes.VIRTUAL,
+				get() {
+					return "visit";
+				},
+				set() {
+					throw new Error("'type' is system managed. Do not set this");
+				},
+			},
 		},
 		{
 			tableName: "visits",
@@ -51,6 +60,13 @@ instances.map((sequelize) => {
 			modelName: "Visit",
 		},
 	);
+
+	Patient(sequelize).hasMany(visit, {
+		onDelete: "CASCADE",
+		onUpdate: "CASCADE",
+		foreignKey: "uuid",
+	});
+	visit.belongsTo(Patient(sequelize));
 });
 
 export const Visit = (db: Sequelize) => db.models["Visit"];

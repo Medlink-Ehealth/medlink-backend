@@ -37,7 +37,7 @@ router.use(async (ctx, next) => {
  *                   type: number
  *                 account:
  *                   description: "account data with security settings attached in 'auth_features' key"
- *                   type: object
+ *                   type: object 
  *                   $ref: "#/components/schemas/Patient"
  *               example:
  *                 status: 200
@@ -168,7 +168,7 @@ router.get("/", async (ctx) => {
  *         description: "Oops! Server error. Media type => text/plain"
  */
 router.patch(
-	"/me/update",
+	"/",
 	requestParser({ multipart: true }),
 	patientProfileUpdate,
 	mediaUpload({ mediaPath: "private" }),

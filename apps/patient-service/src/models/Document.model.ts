@@ -1,4 +1,4 @@
-import { sequelizeInstances } from "@medlink/common";
+import { Patient, sequelizeInstances } from "@medlink/common";
 import { DataTypes, Model, Sequelize } from "sequelize";
 
 const instances = Object.values(sequelizeInstances);
@@ -33,6 +33,15 @@ instances.map((sequelize) => {
 				type: DataTypes.STRING,
 				allowNull: false,
 			},
+			type: {
+				type: DataTypes.VIRTUAL,
+				get() {
+					return "patient_document";
+				},
+				set() {
+					throw new Error("'type' is system managed. Do not set this");
+				},
+			},
 		},
 		{
 			tableName: "patient_documents",
@@ -43,6 +52,13 @@ instances.map((sequelize) => {
 			modelName: "PatientDocument",
 		},
 	);
+
+	Patient(sequelize).hasMany(patientdocument, {
+		onDelete: "CASCADE",
+		onUpdate: "CASCADE",
+		foreignKey: "uuid",
+	});
+	patientdocument.belongsTo(Patient(sequelize));
 });
 
 export const PatientDocument = (db: Sequelize) => db.models["PatientDocument"];

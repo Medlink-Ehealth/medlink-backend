@@ -102,6 +102,7 @@ const options = {
 		`src/api/api.entry.router.ts`,
 		"src/**/*.model.ts",
 		"src/**/*.doc.ts",
+		"../../common/**/*.model.ts"
 	], // files containing annotations as above - keep in mind versioning
 };
 
