@@ -13,7 +13,8 @@
     // "skipLibCheck": true,
   },
   "include": [
-    "**/*.ts"
+    "**/*.ts",
+    "./redis.config.ts",
    ],
   "exclude": ["node_modules", "dist", "**/*.test.ts"]
 }

@@ -1,7 +1,7 @@
 import { authenticateEncryptedToken, Router, statusCodes } from "@medlink/common";
 import { CurrentUserSignedInPatientProfile } from "./profile.route.js";
 import { patientRecords } from "./records.route.js";
-import { patientDocuments } from "./documents.route.js";
+import { patientDocument } from "./documents.route.js";
 import { patientProviders } from "./providers.route.js";
 import { patientHistory } from "./history.route.js";
 
@@ -30,7 +30,7 @@ router.use(
 
 router.use(CurrentUserSignedInPatientProfile.routes());
 router.use(patientHistory.routes());
-router.use(patientDocuments.routes());
+router.use(patientDocument.routes());
 router.use(patientProviders.routes());
 router.use(patientRecords.routes());
 

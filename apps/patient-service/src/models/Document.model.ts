@@ -8,7 +8,7 @@ const instances = Object.values(sequelizeInstances);
  * components:
  *   schemas:
  *     PatientDocument:
- *       description: References to user/patients medical document as available or previously uploaded by users
+ *       description: References to user/patients medical document as available or previously uploaded by users. This schema is main in use by backend and would rarely be required by the frontend
  *       type: object
  *       properties:
  *         uuid:
@@ -18,6 +18,13 @@ const instances = Object.values(sequelizeInstances);
  *         source:
  *           type: string
  *           description: The direct storage access URL of the document
+ *         sourceId:
+ *           type: string
+ *           description: A unique identifier to access document that be not have permanent URL links. Hence sourceId must always exist
+ *         'type':
+ *           type: string
+ *           value: patient_document
+ *           readOnly: true
  */
 
 // bind model to each api env
@@ -32,6 +39,10 @@ instances.map((sequelize) => {
 			source: {
 				type: DataTypes.STRING,
 				allowNull: false,
+			},
+			sourceId: {
+				type: DataTypes.STRING,
+				// allowNull: false,
 			},
 			type: {
 				type: DataTypes.VIRTUAL,

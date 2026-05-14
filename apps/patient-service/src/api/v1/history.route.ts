@@ -1,5 +1,5 @@
 import { Router, statusCodes, UserSecurity, Patient, dbQuerier, logger } from "@medlink/common";
-import { Visit } from "../../models/Visit.model";
+import { Visit } from "../../models/Visit.model.js";
 
 const router = Router("history");
 
@@ -87,7 +87,7 @@ router.get(
 			ctx.status = statusCodes.BAD_REQUEST;
 			return;
 		} catch (err) {
-			logger.error("Packages on collection order database query error:", err);
+			logger.error("History retrieval error:", err);
 
 			ctx.status = statusCodes.BAD_REQUEST;
 			ctx.message = (err as object)["message" as keyof typeof err]

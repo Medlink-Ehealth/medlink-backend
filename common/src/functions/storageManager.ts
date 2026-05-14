@@ -18,7 +18,6 @@ import { logger } from "../utils/logger.js";
 import { config } from "../platform.config.js";
 import { throwError } from "./throwError.js";
 import { statusCodes } from "../constants/index.js";
-import { AppContext } from "../@types/index.js";
 
 const __dirname = path.dirname(url.fileURLToPath(import.meta.url));
 const resolve = (p: string) => path.resolve(__dirname, p);
@@ -134,7 +133,7 @@ class LocalStorageService {
 	}: {
 		disableFileNameRewrite?: boolean;
 		mediaPath: "public" | "private";
-		files?: ParameterizedContext["request"]["req"]["files"];
+		files?: ParameterizedContext["request"]["req"]["files"] | string | string[];
 		relativeContainer?: string | string[];
 	}): Promise<{
 		success: boolean;
@@ -182,9 +181,34 @@ class LocalStorageService {
 		} = {};
 
 		try {
+			// files can optionally be a direct link to a file location on local storage or a URL. Lets handle that foremost
+			const objectifiedStringedArray: {
+				[key: string]: { originalFilename: string; mimetype?: string; newFilename: string; filepath: string };
+			} = {};
+			if (typeof files === "string")
+				objectifiedStringedArray["0"] = {
+					filepath: files,
+					originalFilename: files,
+					mimetype: undefined,
+					newFilename: files.replace(/[^a-zA-Z0-9.]/g, "-"),
+				};
+			else if (Array.isArray(files))
+				files.forEach((file, i) => {
+					objectifiedStringedArray[i.toString()] = {
+						filepath: file,
+						originalFilename: file,
+						mimetype: undefined,
+						newFilename: file.replace(/[^a-zA-Z0-9.]/g, "-"),
+					};
+				});
+			// merge regular request files and URL string in meta
+			const filesMeta = (
+				Object.keys(objectifiedStringedArray).length ? objectifiedStringedArray : (files as ParameterizedContext["request"]["req"]["files"])
+			)!;
+
 			//construct functions to progress data
-			for (const file of Object.keys(files!)) {
-				const fileContents = Array.isArray(files![file]) ? files![file] : [files![file]];
+			for (const file of Object.keys(filesMeta)) {
+				const fileContents = Array.isArray(filesMeta[file]) ? filesMeta[file] : [filesMeta[file]];
 
 				// lets reserve all processed new path here
 				const filePaths: {
@@ -503,7 +527,8 @@ class LocalStorageService {
 							return (
 								(disableFileNameRewrite
 									? name.replace(/[^a-zA-Z0-9 ]/g, "-") // lets strip special characters that may exist
-									: (config.serviceName ? config.serviceName.split(" ").join("") + "-" : "") + part.name + "-" + Date.now().toString()) + ext
+									: (config.serviceName ? config.serviceName.split(" ").join("") + "-" : "") + part.name + "-" + Date.now().toString()) +
+								ext
 							);
 						},
 					});
@@ -1094,6 +1119,7 @@ class LocalStorageService {
 }
 
 class AzureStorageService {
+	private azureContainerProps: azureObject;
 	private storageAccountName: string;
 	private containerName: string;
 	private credential: ClientSecretCredential | DefaultAzureCredential;
@@ -1102,30 +1128,41 @@ class AzureStorageService {
 	private rootDir: string;
 	private event;
 
-	constructor(relativeToProjectRootContainer?: string | string[]) {
+	constructor(relativeToProjectRootContainer?: string | string[] | azureObject, containerStorage?: azureObject) {
+		const importedRelativeProjectRoot =
+			typeof relativeToProjectRootContainer === "string" ||
+			(Array.isArray(relativeToProjectRootContainer) && typeof relativeToProjectRootContainer[0] === "string")
+				? relativeToProjectRootContainer
+				: null;
+		const importedProps = (!importedRelativeProjectRoot && (relativeToProjectRootContainer as azureObject)) || containerStorage;
+		const azureContainerProps = importedProps || (typeof dataPath === "object" && dataPath);
+		if (!azureContainerProps) throw new Error("No azure storage credential provided for storage connector!");
+
+		this.azureContainerProps = azureContainerProps;
+
 		this.event = new EventEmitter();
-		this.storageAccountName = (dataPath as azureObject).STORAGE_ACCOUNT_NAME;
-		this.containerName = (dataPath as azureObject).CONTAINER_NAME;
+		this.storageAccountName = this.azureContainerProps.STORAGE_ACCOUNT_NAME;
+		this.containerName = this.azureContainerProps.CONTAINER_NAME;
 		this.credential = this.getCredential();
 		this.blobServiceClient = this.createBlobServiceClient();
 
 		this.rootDir = this.virtualDirectory(
 			"site",
-			relativeToProjectRootContainer
-				? typeof relativeToProjectRootContainer === "string"
-					? relativeToProjectRootContainer
-					: relativeToProjectRootContainer.join("/")
+			importedRelativeProjectRoot
+				? typeof importedRelativeProjectRoot === "string"
+					? importedRelativeProjectRoot
+					: importedRelativeProjectRoot.join("/")
 				: "storage",
 		); // neccessary for upload destinations. Note that "/site/files/" directory is auto managed internally by greybox. Hence we are enforcing a new holding directory to handle the needed scenario here so Greybox can ignire the files
 	}
 
 	private getCredential() {
 		// Method 1: Using Client Secret (for service principals)
-		if ((dataPath as azureObject).AZURE_CLIENT_SECRET) {
+		if (this.azureContainerProps.AZURE_CLIENT_SECRET) {
 			return new ClientSecretCredential(
-				(dataPath as azureObject).AZURE_TENANT_ID,
-				(dataPath as azureObject).AZURE_CLIENT_ID,
-				(dataPath as azureObject).AZURE_CLIENT_SECRET,
+				this.azureContainerProps.AZURE_TENANT_ID,
+				this.azureContainerProps.AZURE_CLIENT_ID,
+				this.azureContainerProps.AZURE_CLIENT_SECRET,
 			);
 		}
 
@@ -1176,7 +1213,7 @@ class AzureStorageService {
 		mediaPath: "public" | "private";
 		// convertTo?: keyof typeof imageMimeTypes;
 		disableFileNameRewrite?: boolean;
-		files?: AppContext["request"]["files"];
+		files?: ParameterizedContext["request"]["req"]["files"] | string | string[];
 		relativeContainer?: string | string[];
 	}): Promise<{
 		success: boolean;
@@ -1223,14 +1260,39 @@ class AzureStorageService {
 			}[];
 		} = {};
 
+		// files can optionally be a direct link to a file location on local storage or a URL. Lets handle that foremost
+		const objectifiedStringedArray: {
+			[key: string]: { originalFilename: string; mimetype?: string; newFilename: string; filepath: string };
+		} = {};
+		if (typeof files === "string")
+			objectifiedStringedArray["0"] = {
+				filepath: files,
+				originalFilename: files,
+				mimetype: undefined,
+				newFilename: files.replace(/[^a-zA-Z0-9.]/g, "-"),
+			};
+		else if (Array.isArray(files))
+			files.forEach((file, i) => {
+				objectifiedStringedArray[i.toString()] = {
+					filepath: file,
+					originalFilename: file,
+					mimetype: undefined,
+					newFilename: file.replace(/[^a-zA-Z0-9.]/g, "-"),
+				};
+			});
+		// merge regular request files and URL string in meta
+		const filesMeta = (
+			Object.keys(objectifiedStringedArray).length ? objectifiedStringedArray : (files as ParameterizedContext["request"]["req"]["files"])
+		)!;
+
 		try {
 			const containerClient = this.blobServiceClient.getContainerClient(this.containerName);
 
 			// Create container if it doesn't exist
 			await containerClient.createIfNotExists();
 
-			for (const file of Object.keys(files!)) {
-				const fileContents = Array.isArray(files![file]) ? files![file] : [files![file]];
+			for (const file of Object.keys(filesMeta!)) {
+				const fileContents = Array.isArray(filesMeta[file]) ? filesMeta[file] : [filesMeta[file]];
 				// lets reserve all processed new path here
 				const filePaths: {
 					filePath: string;

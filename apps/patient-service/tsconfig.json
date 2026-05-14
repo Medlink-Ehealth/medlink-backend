@@ -11,11 +11,10 @@
 	},
 	"include": [
 		"index.ts",
-		"../../common/redis.config.ts",
 		"app.config.ts",
 		"app.swagger.ts",
-		"src/**/*.ts"
-, "../../common/src/controller/token.auth.controller.ts", "../../common/src/performance.controller.ts"	],
-	"exclude": ["node_modules", "dist", "**/*.test.ts", "**/*.spec.ts"],
+		"src/**/*.ts"],
+	"exclude": ["node_modules", "dist", "**/*.test.ts", 
+	"**/*.spec.ts"],
 	"references": [{ "path": "../../common" }]
 }

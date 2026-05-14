@@ -1,146 +1,182 @@
-import { Op } from "sequelize";
-import { dbQuerier, Notification, Router, statusCodes } from "@medlink/common";
+import { Router, statusCodes, UserSecurity, Patient, dbQuerier, logger, requestParser, storageConnector } from "@medlink/common";
+import { PatientDocument } from "../../models/Document.model.js";
 
-const router = Router({
-	prefix: "/profile",
+const router = Router("documents");
+
+/**
+ * Upload a patient document
+ * @openapi
+ * /patients/documents:
+ *   post:
+ *     tags:
+ *       - Current signed-in patient documents
+ *     summary: Add or upload a document by the signed-in patient user
+ *     description: ""
+ *     security:
+ *       - Token: []
+ *     requestBody:
+ *       description: Request body can be available as json formated or FormData
+ *       required: true
+ *       content:
+ *         multipart/form-data: # Media type
+ *           schema:
+ *             type: object
+ *             properties:
+ *               source:
+ *                 type: string
+ *                 format: file
+ *     responses:
+ *       200:
+ *         description: Returns upload data URL. Data would be returns as array if multiple file upload exists in a single request
+ *         content:
+ *           application/json: # Media type
+ *             schema: # Must-have
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: number
+ *                 statusText:
+ *                   type: string
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     source:
+ *                       type: string
+ *                     sourceId:
+ *                       type: string
+ *                     etag:
+ *                       type: string
+ *               example:
+ *                 status: 200
+ *                 statusText: "Upload Successful"
+ *                 data:
+ *                   source: "https://dkdmd.com/sksjciidcidc"
+ *                   sourceId: 'jncjncjdcdlkcmdkcckmkcmd'
+ *                   etag: ''
+ *       304:
+ *         description: Unable to upload
+ *       406:
+ *         description: Validate not acceptable error. Media type => text/plain
+ *       5xx:
+ *         description: "Oops! Server error. Media type => text/plain"
+ */
+router.post("/", requestParser({ multipart: true }), async (ctx) => {
+	// import storage manager to handle uploads to remote
+	const storage = new storageConnector(); // azure storage credential is set in env but can be overridden here by adding a second parameter
+
+	const upload = await storage.uploadMedia({ files: ctx.request.files, relativeContainer: "temp", mediaPath: "private" });
+
+	console.log("upload::", JSON.stringify(upload, null, 2));
+
+	if (upload.success && upload.files) {
+		const fileProps = Object.values(upload.files)[0].map((file) => ({
+			sourceId: file.requestId,
+			source: file.filePath,
+			etag: file.etag,
+		}));
+		ctx.status = statusCodes.OK;
+		return (ctx.body = {
+			status: statusCodes.OK,
+			statusText: "Upload Successful",
+			data: fileProps.length === 1 ? fileProps[0] : fileProps,
+		});
+	}
+	ctx.status = statusCodes.NOT_ACCEPTABLE;
+	ctx.message = (!upload.success && upload.message) || statusCodes.NOT_ACCEPTABLE.toString();
+	return;
 });
 
+/**
+ * @openapi
+ * /patients/documents:
+ *   get:
+ *     tags:
+ *       - Current signed-in patient documents
+ *     summary: "Fetch the document history of current signed-in patient user"
+ *     description: ""
+ *     security:
+ *       - Token: []
+ *     responses:
+ *       200:
+ *         description: Returns patient documents
+ *         content:
+ *           application/json: # Media type
+ *             schema: # Must-have
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: number
+ *                 account:
+ *                   description: ""
+ *                   type: array
+ *                   items:
+ *                     - $ref: "#/components/schemas/PatientDocument"
+ *               example:
+ *                 status: 200
+ *                 data:
+ *                   - uuid: "df0921a1-261a-40ba-915c-8465d258892d"
+ *                     source: "https://dkdmd.com/sksjciidcidc"
+ *                     sourceId: 'jncjncjdcdlkcmdkcckmkcmd'
+ *                     etag: ''
+ *       401:
+ *         description: Unauthorised response
+ *       5xx:
+ *         description: "Oops! A server error occcurred. Media type => text/plain"
+ */
 
-//view all profile by props
 router.get(
 	"/",
 	async (ctx, next) => {
-		//console.log("ctx.url:", ctx.url);
-		//console.log("ctx.path:", ctx.path);
-		//When no filter exists
 		if (ctx.path === ctx.url) {
-			ctx.url = ctx.url + "?sort[created=DESC]&page[limit=10]";
+			ctx.url = ctx.url + "?sort=[created=ASC]&limit=10";
 		}
 		await next();
 	},
-	dbQuerier({ ignoreStateFiltration: true }),
+	dbQuerier({ ignoreStateFiltration: true, useOlderImplementation: false }),
 	async (ctx) => {
-		//console.log("ctx.state.dbQuerier:", ctx.state.dbQuerier);
-		if (ctx.state.dbQuerier) {
-			const queryFilter = () => {
-				//reserve existing meta if it exists
-				let reservedMeta;
-				if (!ctx.state.dbQuerier.where) ctx.state.dbQuerier.where = { meta: {} };
-				else if (!ctx.state.dbQuerier.where.meta) ctx.state.dbQuerier.where["meta"] = {};
-				else reservedMeta = ctx.state.dbQuerier.where.meta;
-
-				//general user-specific notifications
-				ctx.state.dbQuerier.where.meta = {
-					[Op.and]: [{ [Op.contains]: { target: { type: "User" } } }, { [Op.contains]: { target: { uuid: ctx.state.user.uuid } } }],
-				};
-				//Admin/roles-specific notifications
-				if (ctx.state.user.role)
-					ctx.state.dbQuerier.where.meta = {
-						[Op.or]: [
-							ctx.state.dbQuerier.where.meta,
-							{
-								[Op.and]: [
-									{ [Op.contains]: { target: { type: "UserGroup" } } },
-									{
-										[Op.or]: [
-											{
-												target: {
-													role: {
-														[Op.iLike]: "%" + ctx.state.user.role.toString(),
-													},
-												},
-											}, //Contains role in a list of roles
-											{
-												[Op.contains]: {
-													target: { role: ctx.state.user.role },
-												},
-											}, //Current roles only
-										],
-									},
-								],
-							},
-						],
-					};
-				if (reservedMeta)
-					ctx.state.dbQuerier.where.meta = {
-						...ctx.state.dbQuerier.where.meta,
-						...reservedMeta,
-					};
-				return;
+		// managed include props
+		const signedUser = {
+			model: Patient,
+			required: true,
+			where: { uuid: ctx.state.user.uuid },
+		};
+		if (ctx.state.dbQuerier["include"]) {
+			if (Array.isArray(ctx.state.dbQuerier["include"])) ctx.state.dbQuerier["include"].concat([signedUser]);
+			else if (typeof ctx.state.dbQuerier["include"] === "object")
+				ctx.state.dbQuerier["include"] = [ctx.state.dbQuerier["include"], signedUser];
+		} else
+			ctx.state.dbQuerier = {
+				...ctx.state.dbQuerier,
+				include: [signedUser],
 			};
 
-			//When no model target exists, filter to currently logged user
-			if (!ctx.state.dbQuerier.where || (ctx.state.dbQuerier.where && !ctx.state.dbQuerier.where.meta)) {
-				queryFilter();
-			}
-			//Only fetch notification if at least a Target FILTER exists
-			if (ctx.state.dbQuerier.where.meta && typeof ctx.state.dbQuerier.where.meta === "object") {
-				if (!ctx.state.dbQuerier.limit)
-					//control the query limit if none is defined
-					ctx.state.dbQuerier.limit = 20;
-
-				//console.log("ctx.state.dbQuerier @@:", ctx.state.dbQuerier);
-				const notifications = await Notification(ctx.sequelizeInstance!).findAll(ctx.state.dbQuerier);
-				//console.log("notifications:", notifications);
-				if (!notifications) {
-					ctx.status = statusCodes.NOT_FOUND;
-					return (ctx.body = null);
-				}
+		// fetch document history
+		try {
+			const documents = await PatientDocument(ctx.sequelizeInstance!).findAll(ctx.state.dbQuerier);
+			if (documents && documents[0] instanceof Patient(ctx.sequelizeInstance!)) {
 				ctx.status = statusCodes.OK;
 				ctx.body = {
 					status: statusCodes.OK,
-					data: notifications,
+					data: documents,
 				};
-			} else {
-				ctx.status = statusCodes.FORBIDDEN;
-				ctx.message = "Define at least a META filter to fetch notifications. Or leave out META filter to filter to server default";
+				return;
+			} else if (documents && documents.length === 0) {
+				ctx.status = statusCodes.NOT_FOUND;
+				ctx.message = "No record found";
+				return;
 			}
+			ctx.status = statusCodes.BAD_REQUEST;
+			return;
+		} catch (err) {
+			logger.error("Document retrival error:", err);
+
+			ctx.status = statusCodes.BAD_REQUEST;
+			ctx.message = (err as object)["message" as keyof typeof err]
+				? (err as object)["message" as keyof typeof err]
+				: "Server error occurred";
+			return;
 		}
 	},
 );
 
-//get single notification
-router.get("/:uuid", async (ctx) => {
-	//Only the highest user role besides the DEV role should be able to see a notification
-	const notification = await ctx.sequelizeInstance!.transaction(async (t) => {
-		const highestRole = await AdminRole(ctx.sequelizeInstance!).findOne({
-			order: [["level", "DESC"]],
-			offset: 1,
-			transaction: t,
-		});
-		//console.log("highestRole", highestRole);
-		if (highestRole && ctx.state.user.role >= highestRole.dataValues.level) {
-			return await Notification(ctx.sequelizeInstance!).findByPk(ctx.params.uuid, { transaction: t });
-		} else return false;
-	});
-	if (notification) {
-		ctx.status = statusCodes.OK;
-		ctx.body = {
-			status: statusCodes.OK,
-			data: notification.toJSON(),
-		};
-	} else {
-		ctx.status = statusCodes.NOT_FOUND;
-		ctx.message = "Oops. We are unsure you have the permission to view the notification you are looking for!";
-		return;
-	}
-});
-
-//update single notification status
-router.get("/:uuid/read", async (ctx) => {
-	//Only the highest user role besides the DEV role should be able to see a notification
-	const notification = await Notification(ctx.sequelizeInstance!).update({ status: "read" }, { where: { uuid: ctx.params.uuid } });
-
-	if (notification) {
-		ctx.status = statusCodes.OK;
-		ctx.body = {
-			status: statusCodes.OK,
-		};
-	} else {
-		ctx.status = statusCodes.NOT_FOUND;
-		ctx.message = "Oops. We are unsure you have the permission to view the notification you are looking for!";
-		return;
-	}
-});
-
-export { router as patientDocuments};
+export { router as patientDocument };

@@ -41,10 +41,10 @@ const projectRoot = process.cwd();
 
 // Let import the app/platform configurations
 const platformConfig = nodePath.resolve(nodePath.join(__dirname, "platform.config.js"));
-const serviceConfig =
-	envs.NODE_ENV?.toLowerCase() === "development"
-		? nodePath.resolve(nodePath.join(projectRoot, "app.config.ts"))
-		: nodePath.resolve(nodePath.join(projectRoot, "dist", "app.config.js"));
+
+const serviceConfig = !envs.NODE_ENV?.toLowerCase().includes("production")
+	? nodePath.resolve(nodePath.join(projectRoot, "app.config.ts"))
+	: nodePath.resolve(nodePath.join(projectRoot, "dist", "app.config.js"));
 
 const platformConfigSetting = (await import(platformConfig))?.["default"];
 const serviceConfigSetting = (await import(serviceConfig))?.["default"];

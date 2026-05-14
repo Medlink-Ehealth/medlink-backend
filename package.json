@@ -8,10 +8,12 @@
     "dev": "pnpm -r --parallel run dev",
     "auth": "pnpm --filter auth-service run dev",
     "auth-service": "pnpm --filter auth-service run dev",
+    "auth:test": "pnpm --filter auth-service run test",
     "auth:db:sync": "pnpm --filter auth-service db:sync",
     "auth:db:tup": "pnpm --filter auth-service db:tup",
     "patient": "pnpm --filter patient-service run dev",
     "patient-service": "pnpm --filter patient-service run dev",
+    "patient:test": "pnpm --filter patient-service run test",
     "patient:db:sync": "pnpm --filter patient-service db:sync",
     "patient:db:tup": "pnpm --filter patient-service db:tup",
     "build:common": "pnpm --filter common run build",
@@ -35,7 +37,11 @@
     "koa2-swagger-ui": "^5.12.0",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.58.0",
-    "vitest": "^4.1.2"
+    "vite-plugin-commonjs": "^0.10.4",
+    "vite-plugin-dts": "^4.5.4",
+    "vite-plugin-lib-inject-css": "^2.2.2",
+    "vite-tsconfig-paths": "^6.1.1",
+    "vitest": "^4.1.5"
   },
   "engines": {
     "node": ">=20",
