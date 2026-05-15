@@ -110,9 +110,10 @@ class LocalStorageService {
 				.map((type) => {
 					if (type.includes("/")) return reverseMimetypesToExt(type, this.mimeTypes);
 					else if (type.startsWith(".")) return type;
-					else return type;
+					else return "." + type;
 				})
 				.filter((type) => this.mimeTypes[type as ".jpeg"]);
+
 			// enforce filter mime
 			this.mimeTypes = {} as typeof defaultMimeTypes;
 			if (filtered.length)
@@ -1197,7 +1198,7 @@ class AzureStorageService {
 				.map((type) => {
 					if (type.includes("/")) return reverseMimetypesToExt(type, this.mimeTypes);
 					else if (type.startsWith(".")) return type;
-					else return type;
+					else return "." + type;
 				})
 				.filter((type) => this.mimeTypes[type as ".jpeg"]);
 			// enforce filter mime

@@ -61,20 +61,58 @@ const router = Router("documents");
  *       5xx:
  *         description: "Oops! Server error. Media type => text/plain"
  */
-router.post("/", requestParser({ multipart: true }), async (ctx) => {
+router.post("/", requestParser({ multipart: true, processMedia: ["file", "image"] }), async (ctx) => {
 	// import storage manager to handle uploads to remote
 	const storage = new storageConnector({ uploadMimetype: ["pdf", "png", "jpeg"] }); // azure storage credential is set in env but can be overridden here by adding a second parameter
 
 	const upload = await storage.uploadMedia({ files: ctx.request.files, relativeContainer: "temp", mediaPath: "private" });
 
-	console.log("upload::", JSON.stringify(upload, null, 2));
+	// console.log("upload::", JSON.stringify(upload, null, 2));
 
 	if (upload.success && upload.files) {
-		const fileProps = Object.values(upload.files)[0].map((file) => ({
-			sourceId: file.requestId,
-			source: file.filePath,
-			etag: file.etag,
-		}));
+		const fileProps = Object.keys(upload.files).map((fileLabel) =>
+			upload.files![fileLabel].length === 1
+				? {
+						fieldLabel: fileLabel,
+						sourceId: upload.files![fileLabel][0].requestId,
+						source: upload.files![fileLabel][0].filePath,
+						etag: upload.files![fileLabel][0].etag,
+					}
+				: upload.files![fileLabel].map((innerFile, index) => ({
+						fieldLabel: fileLabel + `-[${index}]`,
+						sourceId: innerFile.requestId,
+						source: innerFile.filePath,
+						etag: innerFile.etag,
+					})),
+		);
+		// lets create db record mapping
+		await ctx.sequelizeInstance!.transaction(async (t) => {
+			for (const doc of fileProps) {
+				if (Array.isArray(doc))
+					for (const innerDoc of doc) {
+						await PatientDocument(ctx.sequelizeInstance!).create(
+							{
+								source: innerDoc.source,
+								sourceId: innerDoc.sourceId,
+								etag: innerDoc.etag,
+								patient: ctx.state.user.uuid, // owner
+							},
+							{ transaction: t },
+						);
+					}
+				else
+					await PatientDocument(ctx.sequelizeInstance!).create(
+						{
+							source: doc.source,
+							sourceId: doc.sourceId,
+							etag: doc.etag,
+							patient: ctx.state.user.uuid, // owner
+						},
+						{ transaction: t },
+					);
+			}
+		});
+
 		ctx.status = statusCodes.OK;
 		return (ctx.body = {
 			status: statusCodes.OK,
@@ -136,7 +174,7 @@ router.get(
 	dbQuerier({ ignoreStateFiltration: true, useOlderImplementation: false }),
 	async (ctx) => {
 		// managed include props
-		const signedUser:Includeable = {
+		const signedUser: Includeable = {
 			model: Patient(ctx.sequelizeInstance!),
 			required: true,
 			where: { uuid: ctx.state.user.uuid },
@@ -154,7 +192,8 @@ router.get(
 		// fetch document history
 		try {
 			const documents = await PatientDocument(ctx.sequelizeInstance!).findAll(ctx.state.dbQuerier);
-			if (documents && documents[0] instanceof Patient(ctx.sequelizeInstance!)) {
+	
+			if (documents && documents[0] instanceof PatientDocument(ctx.sequelizeInstance!)) {
 				ctx.status = statusCodes.OK;
 				ctx.body = {
 					status: statusCodes.OK,

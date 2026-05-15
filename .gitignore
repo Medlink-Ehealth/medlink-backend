@@ -13,6 +13,7 @@ node_modules
 apps/*/node_modules
 site/files
 apps/*/site/files
+apps/*/site/storage
 dist
 dist-ssr
 *.local

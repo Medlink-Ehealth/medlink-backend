@@ -7,7 +7,7 @@ import { config } from "../platform.config.js";
 
 //type defines the kind/type of media
 //type options: image/video
-const media = (type?: "image" | "video" | ("image" | "video")[]): Partial<KoaBodyMiddlewareOptions> => {
+const media = (type?: "image" | "video" | "file" | ("image" | "video" | "file")[]): Partial<KoaBodyMiddlewareOptions> => {
 	const mediaType = type ? (typeof type === "string" ? [type.toLowerCase()] : type.map((ty) => ty.toLowerCase())) : undefined;
 	const imageMaxFileSize =
 		config && config.files && config.files.maxImageUploadSize && typeof config.files.maxImageUploadSize === "number"
@@ -30,7 +30,8 @@ const media = (type?: "image" | "video" | ("image" | "video")[]): Partial<KoaBod
 		formidable: {
 			maxFileSize: mediaType?.includes("video") ? videoMaxFileSize : imageMaxFileSize,
 			filter: (part) => {
-				//console.log("part", part);
+				// console.log("part", part);
+				// console.log("mediaType", mediaType);
 				return !mediaType // disable file processing when no type is defined
 					? false
 					: part.mimetype
@@ -43,7 +44,13 @@ const media = (type?: "image" | "video" | ("image" | "video")[]): Partial<KoaBod
 							part.mimetype.toLowerCase().includes("audio/mpeg") ||
 							//video types outside mp4 & webm not supported
 							part.mimetype.toLowerCase().includes("video/mp4") ||
-							part.mimetype.toLowerCase().includes("video/webm")
+							part.mimetype.toLowerCase().includes("video/webm") ||
+							// file types: restricted to pdf and doc files
+							part.mimetype.toLowerCase().includes("application/pdf") ||
+							part.mimetype.toLowerCase().includes("application/txt") ||
+							part.mimetype.toLowerCase().includes("application/docx") ||
+							part.mimetype.toLowerCase().includes("application/doc") ||
+							part.mimetype.toLowerCase().includes("application/xlst")
 							? true
 							: false
 						: false;
@@ -61,7 +68,7 @@ const media = (type?: "image" | "video" | ("image" | "video")[]): Partial<KoaBod
 				return (
 					(config.serverAddress ? config.serverAddress.split(" ").join("") : "media") +
 					"-" +
-					form.name.replace(/[^a-zA-Z0-9 ]/g, "-") +
+					form.name.replace(/[^a-zA-Z0-9]/g, "-") +
 					"-" +
 					Date.now().toString() +
 					ext

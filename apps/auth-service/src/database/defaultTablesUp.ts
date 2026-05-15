@@ -31,6 +31,7 @@ async function defaultTablesUp() {
 		password: hashPassword("accounts"),
 		role: 4,
 		state: true,
+		verified: true,
 	};
 	const defaultDev = {
 		firstName: "Akintunde",
@@ -39,6 +40,7 @@ async function defaultTablesUp() {
 		password: hashPassword("accounts"),
 		role: 999,
 		state: true,
+		verified: true,
 	};
 
 	const doMian = async () => {
@@ -49,8 +51,8 @@ async function defaultTablesUp() {
 						transaction: t,
 					});
 					if (!checkExistingAdminAccounts || (checkExistingAdminAccounts && checkExistingAdminAccounts.length === 0)) {
-						await Admin(sequelize).create(defaultDev as adminType, { transaction: t });
-						await Admin(sequelize).create(defaultAdmin as adminType, { transaction: t });
+						await Admin(sequelize).create(defaultDev as unknown as adminType, { transaction: t });
+						await Admin(sequelize).create(defaultAdmin as unknown as adminType, { transaction: t });
 					}
 
 					// process for patient user if no exists yet
@@ -61,7 +63,7 @@ async function defaultTablesUp() {
 						await Patient(sequelize).create(patientSample as unknown as PatientStatic["dataValues"], { transaction: t });
 					}
 
-					logger.info("Default Tables UP");
+					logger.info("Default Tables for AUTH SERVICE Populated");
 					return true;
 				});
 			}
@@ -79,7 +81,7 @@ async function defaultTablesUp() {
 			try {
 				for (const sequelize of instances) {
 					sequelize.transaction(async (t) => {
-						logger.info("Dependent Tables UP");
+						logger.info("Dependent Tables for AUTH SERVICE Populated");
 					});
 				}
 				return;

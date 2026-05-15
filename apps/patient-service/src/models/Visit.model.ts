@@ -31,6 +31,8 @@ instances.map((sequelize) => {
 			uuid: {
 				type: DataTypes.UUID,
 				primaryKey: true,
+				defaultValue: DataTypes.UUIDV4,
+				unique: true,
 			},
 			comment: {
 				type: DataTypes.TEXT,
@@ -64,9 +66,18 @@ instances.map((sequelize) => {
 	Patient(sequelize).hasMany(visit, {
 		onDelete: "CASCADE",
 		onUpdate: "CASCADE",
-		foreignKey: "uuid",
+		foreignKey: {
+			name: "patient",
+			allowNull: false,
+		},
 	});
-	visit.belongsTo(Patient(sequelize));
+	visit.belongsTo(Patient(sequelize), {
+		targetKey: "uuid",
+		foreignKey: {
+			name: "patient",
+			allowNull: false,
+		},
+	});
 });
 
 export const Visit = (db: Sequelize) => db.models["Visit"];
