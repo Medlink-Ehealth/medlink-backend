@@ -15,11 +15,12 @@ import {
 	AdminRole,
 	Patient,
 	UserSetting,
+	AdminUser,
+	PatientUser,
 } from "@medlink/common";
 import { AdminStatic, PatientStatic } from "@medlink/types";
 import validator from "validator";
 import { ModelStatic, Sequelize } from "sequelize";
-import { AdminUser, PatientUser } from "../../../../../../../../../common/src/@types/Models.js";
 import { createNewAccount } from "../../../../../../controllers/createNewAccount.controller.js";
 import { adminFormValidator } from "../../../../../../validators/adminFormValidator.js";
 import { patientFormValidator } from "../../../../../../validators/patientFormValidator.js";
@@ -384,8 +385,7 @@ router.get(
 			(usersType && typeof usersType === "string" && !userTypesModelMap[usersType as "admin"])
 		) {
 			ctx.status = statusCodes.BAD_REQUEST;
-			ctx.message =
-				"Account type missing. Define as either 'admin', 'patient' either in the endpoint or as a URL query like type=admin";
+			ctx.message = "Account type missing. Define as either 'admin', 'patient' either in the endpoint or as a URL query like type=admin";
 			return;
 		}
 		if (!validator.isEmail(email)) {
@@ -561,8 +561,7 @@ router.post(
 			(usersType && typeof usersType === "string" && !userTypesModelMap[usersType as "admin"])
 		) {
 			ctx.status = statusCodes.BAD_REQUEST;
-			ctx.message =
-				"Account type missing. Define as either 'admin', 'patient' either in the endpoint or as a URL query like type=admin";
+			ctx.message = "Account type missing. Define as either 'admin', 'patient' either in the endpoint or as a URL query like type=admin";
 			return;
 		} else {
 			const type = userTypesModelMap[usersType as "admin"];
@@ -573,8 +572,7 @@ router.post(
 				await patientFormValidator.createAccount(ctx, next);
 			} else {
 				ctx.status = statusCodes.BAD_REQUEST;
-				ctx.message =
-					"Account type missing. Define as either 'admin', 'patient' either in the endpoint or as a URL query like type=admin";
+				ctx.message = "Account type missing. Define as either 'admin', 'patient' either in the endpoint or as a URL query like type=admin";
 				return;
 			}
 		}
@@ -712,8 +710,7 @@ router.get(["/user/:email/action/:action", "/:usersType/:email/action/:action"],
 		(usersType && typeof usersType === "string" && !userTypesModelMap[usersType as "admin"])
 	) {
 		ctx.status = statusCodes.BAD_REQUEST;
-		ctx.message =
-			"Account type missing. Define as either 'admin', 'patient' either in the endpoint or as a URL query like type=admin";
+		ctx.message = "Account type missing. Define as either 'admin', 'patient' either in the endpoint or as a URL query like type=admin";
 		return;
 	}
 
@@ -1025,8 +1022,7 @@ router.delete(["/user/:email", "/user/:email/delete", "/:usersType/:email", "/:u
 		(usersType && typeof usersType === "string" && !userTypesModelMap[usersType as "admin"])
 	) {
 		ctx.status = statusCodes.BAD_REQUEST;
-		ctx.message =
-			"Account type missing. Define as either 'admin', 'patient' either in the endpoint or as a URL query like type=admin";
+		ctx.message = "Account type missing. Define as either 'admin', 'patient' either in the endpoint or as a URL query like type=admin";
 		return;
 	}
 

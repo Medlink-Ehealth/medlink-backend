@@ -1,10 +1,7 @@
 /* Middleware to manage auth session */
 
-import { decryptToken, encryptionToken, logger, Next, RouterExtendedDefaultContext, statusCodes } from "@medlink/common";
-
+import { decryptToken, encryptionToken, logger, Next, RouterExtendedDefaultContext, statusCodes, redis, Cache } from "@medlink/common";
 import config from "../../app.config.js";
-import Redis from "ioredis";
-import { redis, Cache } from "../performance.controller.js";
 
 /**
  * Process refresh token for access token.

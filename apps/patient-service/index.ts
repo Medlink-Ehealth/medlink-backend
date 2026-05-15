@@ -1,8 +1,7 @@
 import "dotenv/config";
-import { server, storageConnector } from "@medlink/common";
+import { server, storageConnector, redis } from "@medlink/common";
 import { router } from "./src/api/api.entry.router.js";
 import { jobScheduler } from "./src/cron/jobScheduler.js";
-import { redis } from "../../common/src/performance.controller.js";
 
 //Define App server config
 export default (async () => {

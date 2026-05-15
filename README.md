@@ -18,6 +18,14 @@ Access the Swagger documentation at: `<server address>/<api version>/docs`
 ---
 
 ## 🛠 How To
+- **To Run production APP:** 
+  Run below for each micro-service to start-up production app:
+  ```bash
+  pnpm run prod:<service>
+  ```
+  - **Example:** `pnpm run prod:auth`
+  - Review the succeeding sections for production build directions (Note: this readme does not include containerization steps).
+
 - **Run Development Environment:** 
   ```bash
   pnpm run dev
@@ -40,7 +48,7 @@ Access the Swagger documentation at: `<server address>/<api version>/docs`
   pnpm run <service>:db:tup
   ```
   *Seed files are located in `src/database/defaultTablesUp`.*
-
+   
 - **Development or Feature integration:** 
   You should preferably stay in the **root directory** and use the --filter flag. You almost never need to cd into the service directories to run commands.
 
@@ -55,7 +63,7 @@ Access the Swagger documentation at: `<server address>/<api version>/docs`
    > - Use the **root `package.json`** only for repo-wide tools (Prettier, ESLint, TypeScript)
    > - Or for Global scripts like: `"build:all": "pnpm -r run build"`
 
-- **Production deployment:** 
+- **Production build:** 
   Building will transpile to /dist directory in both `/<service name>-service`, and `/common` directories. So the deployment process would need to ensure that both a specific service and common are deployed.
   - ⁠Ensure theses directories are included in a`/<service name>-service`: `dist`, `site` and `package.json` (if you intend to do remote build step during the deployment), otherwise also include `node_modules`
   - Similarly for common, you will need `dist` and `package.json`.

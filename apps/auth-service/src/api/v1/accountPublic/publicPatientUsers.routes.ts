@@ -11,14 +11,13 @@ import {
 	otpLinkGenerator,
 	otpLinkVerifier,
 	requestParser,
-	statusCodes,
+	statusCodes,Patient, UserSetting
 } from "@medlink/common";
 import validator from "validator";
 import { Op } from "sequelize";
 import { patientFormValidator } from "../../../validators/patientFormValidator.js";
 import config from "../../../../app.config.js";
 import { createNewAccount } from "../../../controllers/createNewAccount.controller.js";
-import { Patient, UserSetting } from "../../../../../../common/src/models/accounts/index.js";
 import { userCombosFormValidator } from "../../../validators/userCombosFormValidator.js";
 import { PatientUser } from "@medlink/types";
 import { NonAdminUsersController } from "../../../controllers/NonAdminUsers.addon.userController.js";
