@@ -1,5 +1,6 @@
-import { Router, statusCodes, UserSecurity, Patient, dbQuerier, logger } from "@medlink/common";
+import { Router, statusCodes, dbQuerier, logger, Cache } from "@medlink/common";
 import { Provider } from "../../models/Provider.model.js";
+import Redis from "ioredis";
 
 const router = Router("providers");
 
@@ -58,8 +59,31 @@ router.get(
 	async (ctx) => {
 		// fetch providers
 		try {
+			// performance requirement neccessiate to cache providers for up to 5 minutes in redis. So we check there first before querying DB
+			const checkCache = await Cache.get("schemas:platformProvders");
+			if (checkCache) {
+				try {
+					const providers = JSON.parse(checkCache);
+					// return response once verified as available
+					ctx.status = statusCodes.OK;
+					ctx.body = {
+						status: statusCodes.OK,
+						data: providers,
+					};
+					return;
+				} catch (err) {
+					logger.error("Error parsing item retrived from cache:", err);
+					ctx.status = statusCodes.INTERNAL_SERVER_ERROR;
+					ctx.message = "Server error occurred";
+					return;
+				}
+			}
 			const providers = await Provider(ctx.sequelizeInstance!).findAll(ctx.state.dbQuerier);
-			if (providers && providers[0] instanceof Patient(ctx.sequelizeInstance!)) {
+			if (providers && providers[0] instanceof Provider(ctx.sequelizeInstance!)) {
+				// save in cache
+				if (Cache instanceof Redis) Cache.set("schemas:platformProvders", JSON.stringify(providers), "EX", 5 * 60 * 1000);
+				else Cache.set("schemas:platformProvders", JSON.stringify(providers));
+
 				ctx.status = statusCodes.OK;
 				ctx.body = {
 					status: statusCodes.OK,

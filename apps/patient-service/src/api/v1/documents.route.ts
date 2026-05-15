@@ -1,5 +1,6 @@
-import { Router, statusCodes, UserSecurity, Patient, dbQuerier, logger, requestParser, storageConnector } from "@medlink/common";
+import { Router, statusCodes, Patient, dbQuerier, logger, requestParser, storageConnector } from "@medlink/common";
 import { PatientDocument } from "../../models/Document.model.js";
+import { Includeable } from "sequelize";
 
 const router = Router("documents");
 
@@ -62,7 +63,7 @@ const router = Router("documents");
  */
 router.post("/", requestParser({ multipart: true }), async (ctx) => {
 	// import storage manager to handle uploads to remote
-	const storage = new storageConnector(); // azure storage credential is set in env but can be overridden here by adding a second parameter
+	const storage = new storageConnector({ uploadMimetype: ["pdf", "png", "jpeg"] }); // azure storage credential is set in env but can be overridden here by adding a second parameter
 
 	const upload = await storage.uploadMedia({ files: ctx.request.files, relativeContainer: "temp", mediaPath: "private" });
 
@@ -135,8 +136,8 @@ router.get(
 	dbQuerier({ ignoreStateFiltration: true, useOlderImplementation: false }),
 	async (ctx) => {
 		// managed include props
-		const signedUser = {
-			model: Patient,
+		const signedUser:Includeable = {
+			model: Patient(ctx.sequelizeInstance!),
 			required: true,
 			where: { uuid: ctx.state.user.uuid },
 		};

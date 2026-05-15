@@ -148,7 +148,7 @@ router.get("/", async (ctx) => {
  *                 status: 200
  *                 account:
  *                   uuid: "df0921a1-261a-40ba-915c-8465d258892d"
- *                   avatar: "/picture.jpg"
+ *                   picture: "/picture.jpg"
  *                   firstName: Emma
  *                   lastName: Emma
  *                   gender: Male

@@ -1,5 +1,6 @@
-import { Router, statusCodes, UserSecurity, Patient, dbQuerier, logger } from "@medlink/common";
+import { Router, statusCodes, Patient, dbQuerier, logger } from "@medlink/common";
 import { Visit } from "../../models/Visit.model.js";
+import { Includeable } from "sequelize";
 
 const router = Router("history");
 
@@ -54,8 +55,8 @@ router.get(
 	dbQuerier({ ignoreStateFiltration: true, useOlderImplementation: false }),
 	async (ctx) => {
 		// managed include props
-		const signedUser = {
-			model: Patient,
+		const signedUser:Includeable = {
+			model: Patient(ctx.sequelizeInstance!),
 			required: true,
 			where: { uuid: ctx.state.user.uuid },
 		};

@@ -92,4 +92,4 @@ async function defaultTablesUp() {
 }
 
 await defaultTablesUp();
-process.exit();
+// process.exit();

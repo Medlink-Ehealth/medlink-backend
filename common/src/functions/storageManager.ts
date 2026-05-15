@@ -48,16 +48,17 @@ const imageMimeTypes = {
 	".svg": "image/svg+xml",
 	// ".ico": "image/x-icon",
 };
-const mimeTypes = {
+const defaultMimeTypes = {
 	// Text files
-	// ".html": "text/html",
-	// ".htm": "text/html",
-	// ".css": "text/css",
-	// ".js": "application/javascript",
-	// ".json": "application/json",
-	// ".txt": "text/plain",
-	// ".xml": "application/xml",
-	// ".csv": "text/csv",
+	".html": "text/html",
+	".htm": "text/html",
+	".css": "text/css",
+	".js": "application/javascript",
+	".json": "application/json",
+	".txt": "text/plain",
+	".xml": "application/xml",
+	".pdf": "application/pdf",
+	".csv": "text/csv",
 
 	// Images
 	...imageMimeTypes,
@@ -77,22 +78,51 @@ const mimeTypes = {
 	// ".mkv": "video/x-matroska",
 };
 // deduce file extension from mimetypes
-const reverseMimetypesToExt = (mimetype: string) => {
+const reverseMimetypesToExt = (mimetype: string, mimeTypes: typeof defaultMimeTypes) => {
 	return Object.keys(mimeTypes).filter((loop) => mimeTypes[loop as ".jpg"] === mimetype)[0];
 };
-
-const formidableFilter =
-	(mimetypes: string[] = Object.values(mimeTypes)) =>
-	(part: formidable.Part) => {
-		// disable file processing when no type is defined
-		return part.mimetype ? mimetypes.includes(part.mimetype.toLowerCase()) : false;
-	};
 
 class LocalStorageService {
 	private rootDir: string;
 	private cwd = process.cwd();
 	private event;
-	constructor(relativeToProjectRootContainer?: string | string[]) {
+	private mimeTypes = defaultMimeTypes;
+
+	constructor(
+		options?:
+			| string
+			| string[]
+			| {
+					relativeToProjectRootContainer?: string | string[];
+					// containerStorage?: azureObject;
+					uploadMimetype: string | string[]; // restrict to specific mime type(s)
+			  },
+	) {
+		const { relativeToProjectRootContainer, uploadMimetype } =
+			typeof options === "string" || Array.isArray(options)
+				? { relativeToProjectRootContainer: options, uploadMimetype: undefined }
+				: options || {};
+
+		if (uploadMimetype) {
+			const uploadRestriction = typeof uploadMimetype === "string" ? [uploadMimetype] : uploadMimetype;
+			// lets handle possible variable as jpeg, .jpeg, image/jpeg
+			const filtered = uploadRestriction
+				.map((type) => {
+					if (type.includes("/")) return reverseMimetypesToExt(type, this.mimeTypes);
+					else if (type.startsWith(".")) return type;
+					else return type;
+				})
+				.filter((type) => this.mimeTypes[type as ".jpeg"]);
+			// enforce filter mime
+			this.mimeTypes = {} as typeof defaultMimeTypes;
+			if (filtered.length)
+				filtered.forEach((type) => {
+					this.mimeTypes[type as ".jpeg"] = defaultMimeTypes[type as ".jpeg"];
+				});
+			// lets ensure valid mime types now exists
+			if (!Object.keys(this.mimeTypes).length) throw new Error("Invalid mimetypes defined in initialiser");
+		}
+
 		this.event = new EventEmitter();
 		this.rootDir = path.join(
 			this.cwd,
@@ -117,6 +147,13 @@ class LocalStorageService {
 			return false;
 		}
 	}
+
+	private formidableFilter =
+		(mimetypes: string[] = Object.values(this.mimeTypes)) =>
+		(part: formidable.Part) => {
+			// disable file processing when no type is defined
+			return part.mimetype ? mimetypes.includes(part.mimetype.toLowerCase()) : false;
+		};
 
 	on(
 		eventName: "error" | "completed" | "pending",
@@ -189,7 +226,7 @@ class LocalStorageService {
 				objectifiedStringedArray["0"] = {
 					filepath: files,
 					originalFilename: files,
-					mimetype: undefined,
+					mimetype: this.mimeTypes[("." + files.split(".")[files.split(".").length - 1]) as ".jpeg"],
 					newFilename: files.replace(/[^a-zA-Z0-9.]/g, "-"),
 				};
 			else if (Array.isArray(files))
@@ -197,7 +234,7 @@ class LocalStorageService {
 					objectifiedStringedArray[i.toString()] = {
 						filepath: file,
 						originalFilename: file,
-						mimetype: undefined,
+						mimetype: this.mimeTypes[("." + file.split(".")[file.split(".").length - 1]) as ".jpeg"],
 						newFilename: file.replace(/[^a-zA-Z0-9.]/g, "-"),
 					};
 				});
@@ -206,6 +243,7 @@ class LocalStorageService {
 				Object.keys(objectifiedStringedArray).length ? objectifiedStringedArray : (files as ParameterizedContext["request"]["req"]["files"])
 			)!;
 
+			let isPartialResult = "";
 			//construct functions to progress data
 			for (const file of Object.keys(filesMeta)) {
 				const fileContents = Array.isArray(filesMeta[file]) ? filesMeta[file] : [filesMeta[file]];
@@ -217,6 +255,12 @@ class LocalStorageService {
 					etag?: string;
 				}[] = [];
 				for (const content of fileContents) {
+					const currentPath = content.filepath;
+					if (!content.mimetype || !reverseMimetypesToExt(content.mimetype, this.mimeTypes)) {
+						mediaDumpDirFromFormidable.push(currentPath); // schedule for deletion
+						continue;
+					}
+
 					let destinationFolder = content.mimetype
 						? content.mimetype.includes("image") || content.mimetype.includes("svg")
 							? "image"
@@ -244,7 +288,6 @@ class LocalStorageService {
 
 					const newPath = path.join(containerDirectry, fileName);
 
-					const currentPath = content.filepath;
 					const moveNonImageFile = () => {
 						//console.log("currentPath", currentPath);
 						//console.log("newPath", newPath);
@@ -262,7 +305,7 @@ class LocalStorageService {
 						}
 					};
 
-					const mediaIsImage = content.mimetype && imageMimeTypes[reverseMimetypesToExt(content.mimetype) as ".jpg"];
+					const mediaIsImage = content.mimetype && imageMimeTypes[reverseMimetypesToExt(content.mimetype, this.mimeTypes) as ".jpg"];
 
 					if (!mediaIsImage) await moveNonImageFile();
 					else
@@ -292,7 +335,8 @@ class LocalStorageService {
 				}
 				// console.log("file", file);
 				// console.log("filePaths", filePaths);
-
+				if (!filePaths.length) isPartialResult = "No support file type found!";
+				else if (filePaths.length !== fileContents.length) isPartialResult = "Some unsupported file types has been ignored";
 				bodyFiles[file] = filePaths;
 			}
 			// clear dumps
@@ -310,6 +354,7 @@ class LocalStorageService {
 			return {
 				success: true,
 				files: bodyFiles,
+				message: isPartialResult || undefined,
 			};
 		} catch (error) {
 			logger.error("Local File upload processing error:", error);
@@ -420,7 +465,7 @@ class LocalStorageService {
 
 					const mimetype = reqOrStream.mimetype;
 					// ensure only compatible mime type
-					if (!(mimetypes || Object.values(mimeTypes)).includes(mimetype.toLowerCase()))
+					if (!(mimetypes || Object.values(this.mimeTypes)).includes(mimetype.toLowerCase()))
 						return {
 							success: false,
 							files: null,
@@ -428,8 +473,8 @@ class LocalStorageService {
 						};
 
 					const ext = reqOrStream.mimetype.includes(",")
-						? reverseMimetypesToExt(reqOrStream.mimetype.split(",")[0])
-						: reverseMimetypesToExt(reqOrStream.mimetype);
+						? reverseMimetypesToExt(reqOrStream.mimetype.split(",")[0], this.mimeTypes)
+						: reverseMimetypesToExt(reqOrStream.mimetype, this.mimeTypes);
 					const fileName = (config.serviceName ? config.serviceName.split(" ").join("") + "-" : "") + "-" + Date.now().toString() + ext;
 
 					// let put toget the destination dir
@@ -516,13 +561,13 @@ class LocalStorageService {
 						uploadDir: containerTempDirectry, //relative to App root
 						// keepExtensions: true,
 						multiples: true,
-						filter: formidableFilter(mimetypes),
+						filter: this.formidableFilter(mimetypes),
 						filename: (name, ext, part) => {
 							// lets extract ext where it does not exist from mimetype, keeping in mind that this might sometimes list multiple. We simple pick the first
 							if (!ext && part.mimetype) {
 								ext = part.mimetype.includes(",")
-									? reverseMimetypesToExt(part.mimetype.split(",")[0])
-									: reverseMimetypesToExt(part.mimetype);
+									? reverseMimetypesToExt(part.mimetype.split(",")[0], this.mimeTypes)
+									: reverseMimetypesToExt(part.mimetype, this.mimeTypes);
 							}
 							return (
 								(disableFileNameRewrite
@@ -653,7 +698,7 @@ class LocalStorageService {
 			}
 			// detect if its valid file type
 			const fileMeta = await fileTypeFromBuffer(buffer);
-			if (fileMeta && formidableFilter(mimetype ? (Array.isArray(mimetype) ? mimetype : [mimetype]) : undefined)) {
+			if (fileMeta && this.formidableFilter(mimetype ? (Array.isArray(mimetype) ? mimetype : [mimetype]) : undefined)) {
 				// console.log("content - file", content);
 				let destinationFolder = fileMeta.mime
 					? fileMeta.mime.includes("image") || fileMeta.mime.includes("svg")
@@ -967,7 +1012,7 @@ class LocalStorageService {
 		if (returnAs === "buffer") return this.readFileSync(filePath);
 
 		const ext = path.extname(filePath).toLowerCase() as ".jpeg";
-		const contentType = mimeTypes[ext] || "application/octet-stream";
+		const contentType = defaultMimeTypes[ext] || "application/octet-stream";
 
 		// Get file stats
 		const stats = fs.statSync(filePath);
@@ -1057,7 +1102,7 @@ class LocalStorageService {
 			}
 
 			const ext = path.extname(filePath).toLowerCase() as ".jpeg";
-			const contentType = mimeTypes[ext] || "application/octet-stream";
+			const contentType = defaultMimeTypes[ext] || "application/octet-stream";
 
 			// Get file stats
 			const stats = fs.statSync(filePath);
@@ -1127,8 +1172,44 @@ class AzureStorageService {
 	private cwd = process.cwd();
 	private rootDir: string;
 	private event;
+	private mimeTypes = defaultMimeTypes;
 
-	constructor(relativeToProjectRootContainer?: string | string[] | azureObject, containerStorage?: azureObject) {
+	constructor(
+		options?:
+			| string
+			| string[]
+			| azureObject
+			| {
+					relativeToProjectRootContainer?: string | string[] | azureObject;
+					containerStorage?: azureObject;
+					uploadMimetype?: string | string[]; // restrict to specific mime type(s)
+			  },
+	) {
+		const { relativeToProjectRootContainer, containerStorage, uploadMimetype } =
+			typeof options === "string" || Array.isArray(options) || (typeof options === "object" && "STORAGE_ACCOUNT_NAME" in options)
+				? { relativeToProjectRootContainer: options, containerStorage: undefined, uploadMimetype: undefined }
+				: options || {};
+
+		if (uploadMimetype) {
+			const uploadRestriction = typeof uploadMimetype === "string" ? [uploadMimetype] : uploadMimetype;
+			// lets handle possible variable as jpeg, .jpeg, image/jpeg
+			const filtered = uploadRestriction
+				.map((type) => {
+					if (type.includes("/")) return reverseMimetypesToExt(type, this.mimeTypes);
+					else if (type.startsWith(".")) return type;
+					else return type;
+				})
+				.filter((type) => this.mimeTypes[type as ".jpeg"]);
+			// enforce filter mime
+			this.mimeTypes = {} as typeof defaultMimeTypes;
+			if (filtered.length)
+				filtered.forEach((type) => {
+					this.mimeTypes[type as ".jpeg"] = defaultMimeTypes[type as ".jpeg"];
+				});
+			// lets ensure valid mime types now exists
+			if (!Object.keys(this.mimeTypes).length) throw new Error("Invalid mimetypes defined in initialiser");
+		}
+
 		const importedRelativeProjectRoot =
 			typeof relativeToProjectRootContainer === "string" ||
 			(Array.isArray(relativeToProjectRootContainer) && typeof relativeToProjectRootContainer[0] === "string")
@@ -1196,6 +1277,13 @@ class AzureStorageService {
 			return false;
 		}
 	}
+
+	private formidableFilter =
+		(mimetypes: string[] = Object.values(this.mimeTypes)) =>
+		(part: formidable.Part) => {
+			// disable file processing when no type is defined
+			return part.mimetype ? mimetypes.includes(part.mimetype.toLowerCase()) : false;
+		};
 
 	on(
 		eventName: "error" | "completed" | "pending",
@@ -1268,7 +1356,7 @@ class AzureStorageService {
 			objectifiedStringedArray["0"] = {
 				filepath: files,
 				originalFilename: files,
-				mimetype: undefined,
+				mimetype: this.mimeTypes[("." + files.split(".")[files.split(".").length - 1]) as ".jpeg"],
 				newFilename: files.replace(/[^a-zA-Z0-9.]/g, "-"),
 			};
 		else if (Array.isArray(files))
@@ -1276,7 +1364,7 @@ class AzureStorageService {
 				objectifiedStringedArray[i.toString()] = {
 					filepath: file,
 					originalFilename: file,
-					mimetype: undefined,
+					mimetype: this.mimeTypes[("." + file.split(".")[file.split(".").length - 1]) as ".jpeg"],
 					newFilename: file.replace(/[^a-zA-Z0-9.]/g, "-"),
 				};
 			});
@@ -1290,6 +1378,7 @@ class AzureStorageService {
 
 			// Create container if it doesn't exist
 			await containerClient.createIfNotExists();
+			let isPartialResult = "";
 
 			for (const file of Object.keys(filesMeta!)) {
 				const fileContents = Array.isArray(filesMeta[file]) ? filesMeta[file] : [filesMeta[file]];
@@ -1302,6 +1391,12 @@ class AzureStorageService {
 				}[] = [];
 
 				for (const content of fileContents) {
+					const currentPath = content.filepath;
+					if (!content.mimetype || !reverseMimetypesToExt(content.mimetype, this.mimeTypes)) {
+						mediaDumpDirFromFormidable.push(currentPath); // schedule for deletion
+						continue;
+					}
+
 					let destinationFolder = content.mimetype
 						? content.mimetype.includes("image") || content.mimetype.includes("svg")
 							? "image"
@@ -1331,7 +1426,6 @@ class AzureStorageService {
 					// set azure directory + file name
 					const blockBlobClient = containerClient.getBlockBlobClient(newPath);
 
-					const currentPath = content.filepath;
 					const moveNonImageFile = async () => {
 						//console.log("currentPath", currentPath);
 						//console.log("newPath", newPath);
@@ -1356,7 +1450,7 @@ class AzureStorageService {
 						}
 					};
 
-					const mediaIsImage = content.mimetype && imageMimeTypes[reverseMimetypesToExt(content.mimetype) as ".jpg"];
+					const mediaIsImage = content.mimetype && imageMimeTypes[reverseMimetypesToExt(content.mimetype, this.mimeTypes) as ".jpg"];
 
 					if (!mediaIsImage) await moveNonImageFile();
 					else {
@@ -1378,6 +1472,8 @@ class AzureStorageService {
 					}
 				}
 				// console.log("filePaths", filePaths);
+				if (!filePaths.length) isPartialResult = "No support file type found!";
+				else if (filePaths.length !== fileContents.length) isPartialResult = "Some unsupported file types has been ignored";
 
 				bodyFiles[file] = filePaths;
 			}
@@ -1396,6 +1492,7 @@ class AzureStorageService {
 			return {
 				success: true,
 				files: bodyFiles,
+				message: isPartialResult || undefined,
 			};
 		} catch (error) {
 			logger.error("Azure File upload processing error:", error);
@@ -1481,12 +1578,14 @@ class AzureStorageService {
 				// build formidable
 				const form = formidable({
 					multiples: true,
-					filter: formidableFilter(mimetypes),
+					filter: this.formidableFilter(mimetypes),
 					// keepExtensions: true,
 					filename: (name, ext, part) => {
 						// lets extract ext where it does not exist from mimetype, keeping in mind that this might sometimes list multiple. We simple pick the first
 						if (!ext && part.mimetype) {
-							ext = part.mimetype.includes(",") ? reverseMimetypesToExt(part.mimetype.split(",")[0]) : reverseMimetypesToExt(part.mimetype);
+							ext = part.mimetype.includes(",")
+								? reverseMimetypesToExt(part.mimetype.split(",")[0], this.mimeTypes)
+								: reverseMimetypesToExt(part.mimetype, this.mimeTypes);
 						}
 						return (
 							(disableFileNameRewrite
@@ -1666,7 +1765,7 @@ class AzureStorageService {
 
 			// detect if its valid file type
 			const fileMeta = await fileTypeFromBuffer(buffer);
-			if (fileMeta && formidableFilter(mimetypes)) {
+			if (fileMeta && this.formidableFilter(mimetypes)) {
 				const containerClient = this.blobServiceClient.getContainerClient(this.containerName);
 				// Create container if it doesn't exist
 				await containerClient.createIfNotExists();
@@ -1936,7 +2035,7 @@ class AzureStorageService {
 		} = options ? options : {};
 
 		const ext = path.extname(filePath).toLowerCase() as ".jpeg";
-		const contentType = mimeTypes[ext] || "application/octet-stream";
+		const contentType = defaultMimeTypes[ext] || "application/octet-stream";
 
 		// Get file stats
 		const stats = fs.statSync(filePath);
@@ -2026,7 +2125,7 @@ class AzureStorageService {
 			}
 
 			const ext = path.extname(filePath).toLowerCase() as ".jpeg";
-			const contentType = mimeTypes[ext] || "application/octet-stream";
+			const contentType = defaultMimeTypes[ext] || "application/octet-stream";
 
 			// Get file stats
 			const stats = fs.statSync(filePath);

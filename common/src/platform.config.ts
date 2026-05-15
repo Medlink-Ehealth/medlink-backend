@@ -7,11 +7,10 @@ const config: PlatformConfig = {
 	methods: ["GET", "PATCH", "POST", "DELETE"], //allows to define/limit allowed request methods
 	//site media file controller
 	files: {
-		filesUploadRolePermission: 1,
+		filesUploadRolePermission: 0,
 		maxImageUploadSize: 10 * 1024 * 1024, //10mb
 		maxVideoUploadSize: 100 * 1024 * 1024, //100mb
-		maxOtherFilesUploadSize: 2 * 1024 * 1024, //2mb
-		dynamicallyServeFilesInDirectory: [], // string | string[] | string[][];
+		maxOtherFilesUploadSize: 10 * 1024 * 1024, //10mb
 	},
 	//server config
 	debug: false,
