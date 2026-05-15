@@ -1,4 +1,4 @@
-/* Currently signed in any user account */
+/* Currently handle signed in of any user account */
 import {
 	comparePassword,
 	exceptionHandler,
@@ -19,7 +19,7 @@ import {
 	defaultMailTemplate,
 } from "@medlink/common";
 
-import { clientFormValidator } from "../../../../validators/clientFormValidator.js";
+import { patientFormValidator } from "../../../../validators/patientFormValidator.js";
 import { unlinkSync } from "node:fs";
 import path from "node:path";
 import validator from "validator";
@@ -31,7 +31,7 @@ import Redis from "ioredis";
 
 const router = Router();
 const userTypes = {
-	client: "Client",
+	patient: "Patient",
 	admin: "Admin",
 };
 
@@ -58,7 +58,7 @@ router.use(async (ctx, next) => {
  *       - Token: []
  *     responses:
  *       200:
- *         description: Returns client/admin user data
+ *         description: Returns patient/admin user data
  *         content:
  *           application/json: # Media type
  *             schema: # Must-have
@@ -70,7 +70,7 @@ router.use(async (ctx, next) => {
  *                   description: "account data with security settings attached in 'auth_features' key"
  *                   oneOf:
  *                     - type: object
- *                       $ref: "#/components/schemas/Client"
+ *                       $ref: "#/components/schemas/Patient"
  *                     - type: object
  *                       $ref: "#/components/schemas/Admin"
  *               example:
@@ -93,7 +93,7 @@ router.use(async (ctx, next) => {
  *                     recovery_emails:
  *                       - verified: true
  *                         email: emma-watson2025@gmail.com
- *                   'type': 'client'
+ *                   'type': 'patient'
  *                   created: 2024-12-05T19:00:00.151Z
  *                   updated: 2024-12-05T19:00:00.151Z
  *       401:
@@ -106,7 +106,7 @@ router.get("/me", async (ctx) => {
 	if (ctx.isAuthenticated()) {
 		// lets fetch management scope for user that includes allowable sensitive data
 		const user = await ctx
-			.sequelizeInstance!.models[userTypes[ctx.state.user.type as "client"]].scope("management")
+			.sequelizeInstance!.models[userTypes[ctx.state.user.type as "patient"]].scope("management")
 			.findByPk(ctx.state.user.uuid);
 		if (!user) {
 			ctx.status = statusCodes.SERVICE_UNAVAILABLE;
@@ -241,7 +241,7 @@ router.get("/logout", async (ctx) => {
  *                   description: account data
  *                   oneOf:
  *                     - type: object
- *                       $ref: "#/components/schemas/Client"
+ *                       $ref: "#/components/schemas/Patient"
  *                     - type: object
  *                       $ref: "#/components/schemas/Admin"
  *               example:
@@ -258,7 +258,7 @@ router.get("/logout", async (ctx) => {
  *                   email: emma-watson@gmail.com
  *                   state: true
  *                   verified: true
- *                   'type': 'client'
+ *                   'type': 'patient'
  *                   created: 2024-12-05T19:00:00.151Z
  *                   updated: 2024-12-05T19:00:00.151Z
  *       304:
@@ -272,7 +272,7 @@ router.patch(
 	"/me/update",
 	requestParser({ multipart: true }),
 	async (ctx, next) => {
-		if (ctx.state.user.type === "client") await clientFormValidator.updateAccount(ctx, next);
+		if (ctx.state.user.type === "patient") await patientFormValidator.updateAccount(ctx, next);
 		else if (ctx.state.user.type === "admin") await adminFormValidator.updateAccount(ctx, next);
 		else {
 			ctx.status = statusCodes.UNAUTHORIZED;
@@ -286,7 +286,7 @@ router.patch(
 		if (ctx.request.body.email) delete ctx.request.body.email;
 		if (ctx.request.body.phoneNumber) delete ctx.request.body.phoneNumber;
 		//call next
-		await updateAccount({ userType: userTypes[ctx.state.user.type as "client"] })(ctx, next);
+		await updateAccount({ userType: userTypes[ctx.state.user.type as "patient"] })(ctx, next);
 	},
 	(ctx) => {
 		if (ctx.state.updatedUser) {
@@ -361,14 +361,14 @@ router.patch(
 	async (ctx) => {
 		try {
 			if (ctx.request.body["avatar"] || ctx.request.body["avatar"] === null) {
-				const user = await ctx.sequelizeInstance!.models[userTypes[ctx.state.user.type as "client"]].findByPk(ctx.state.user.uuid);
+				const user = await ctx.sequelizeInstance!.models[userTypes[ctx.state.user.type as "patient"]].findByPk(ctx.state.user.uuid);
 				if (user) {
 					if (user.getDataValue("avatar"))
 						try {
 							unlinkSync(path.join(process.cwd(), user.getDataValue("avatar")));
 						} catch (err) {
 							/* Prevent error from leaking to the frontend due to unlink failure */
-							logger.error(`${userTypes[ctx.state.user.type as "client"]} Avatar unlinking error`, err);
+							logger.error(`${userTypes[ctx.state.user.type as "patient"]} Avatar unlinking error`, err);
 						}
 					// When aiming to remove avatar but it does not even exist
 					else if (ctx.request.body["avatar"] === null) {
@@ -582,7 +582,7 @@ router.patch(
 				ctx.message = "New passowrd cannot be the same with previous password";
 				return;
 			} else {
-				user = await ctx.sequelizeInstance!.models[userTypes[ctx.state.user.type as "client"]].scope("raw").findByPk(ctx.state.user.uuid);
+				user = await ctx.sequelizeInstance!.models[userTypes[ctx.state.user.type as "patient"]].scope("raw").findByPk(ctx.state.user.uuid);
 
 				if (!user || !comparePassword(currentPassword as string, user.getDataValue("password"))) {
 					ctx.status = statusCodes.BAD_REQUEST;
@@ -620,11 +620,11 @@ router.patch(
 						} else {
 							const OTPvalue = (await otpLinkGenerator({
 								sequelize: ctx.sequelizeInstance!,
-								entityReference: userTypes[ctx.state.user.type as "client"],
+								entityReference: userTypes[ctx.state.user.type as "patient"],
 								numberOfOTPChar: 4,
 								typeOfOTPChar: "numbers",
 								queryIdentifier: identifiers,
-								log: `${userTypes[ctx.state.user.type as "client"]}: password change by user`,
+								log: `${userTypes[ctx.state.user.type as "patient"]}: password change by user`,
 								expiry: "3m",
 								returnOTP: true,
 							})) as string;
@@ -697,7 +697,7 @@ router.patch(
 			ctx.message = "Your password is required to effect any change";
 			return;
 		} else {
-			user = await ctx.sequelizeInstance!.models[userTypes[ctx.state.user.type as "client"]].scope("raw").findByPk(ctx.state.user.uuid);
+			user = await ctx.sequelizeInstance!.models[userTypes[ctx.state.user.type as "patient"]].scope("raw").findByPk(ctx.state.user.uuid);
 
 			if (!user || !comparePassword(password as string, user.getDataValue("password"))) {
 				ctx.status = statusCodes.BAD_REQUEST;
@@ -737,11 +737,11 @@ router.patch(
 				// generate OTP with required ID
 				const OTPvalue = (await otpLinkGenerator({
 					sequelize: ctx.sequelizeInstance!,
-					entityReference: userTypes[ctx.state.user.type as "client"],
+					entityReference: userTypes[ctx.state.user.type as "patient"],
 					numberOfOTPChar: 4,
 					typeOfOTPChar: "numbers",
 					queryIdentifier: updatedItem,
-					log: `${userTypes[ctx.state.user.type as "client"]}: ${updateType} change by user`,
+					log: `${userTypes[ctx.state.user.type as "patient"]}: ${updateType} change by user`,
 					expiry: "3m",
 					returnOTP: true,
 				})) as string;

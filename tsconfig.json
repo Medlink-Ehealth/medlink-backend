@@ -9,12 +9,13 @@
 		"strict": true,
 		"resolveJsonModule": true,
 		"paths": {
-			"@medlink/common": ["./common/index.ts"],
+			"@medlink/common": ["./common/src/index.ts"],
 			"@medlink/common/*": ["./common/src/*"],
-			"@medlink/common/config": ["./common/platform.config.ts"]
+			"@medlink/types": ["./common/src/@types/index.ts"],
+			"@medlink/config": ["./common/src/platform.config.ts"]
 		}
 	},
 	"include": ["./common/types"],
 	"files": [],
-	"references": [{ "path": "./common" }, { "path": "./apps/auth-service" }]
+	"references": [{ "path": "./common" }, { "path": "./apps/auth-service" }, { "path": "./apps/patient-service" }]
 }

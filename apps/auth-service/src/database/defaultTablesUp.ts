@@ -1,5 +1,4 @@
-import { hashPassword, logger, sequelizeInstances } from "@medlink/common";
-import { Admin } from "../models/accounts/Admin.model.js";
+import { hashPassword, logger, sequelizeInstances, Admin, Patient, PatientStatic } from "@medlink/common";
 
 const instances = Object.values(sequelizeInstances);
 
@@ -15,6 +14,16 @@ type adminType = {
 };
 
 async function defaultTablesUp() {
+	const patientSample = {
+		firstName: "Akin",
+		lastName: "EB",
+		email: "ebakintunde@icloud.com",
+		password: hashPassword("accounts"),
+		dob: Date.now(),
+		address: "No 2, Orishigun str, Alapere Ketu",
+		state: true,
+		verified: true,
+	};
 	const defaultAdmin = {
 		firstName: "Akintunde",
 		lastName: "EB",
@@ -43,6 +52,15 @@ async function defaultTablesUp() {
 						await Admin(sequelize).create(defaultDev as adminType, { transaction: t });
 						await Admin(sequelize).create(defaultAdmin as adminType, { transaction: t });
 					}
+
+					// process for patient user if no exists yet
+					const checkExistingPatientAccounts = await Patient(sequelize).findAll({
+						transaction: t,
+					});
+					if (!checkExistingPatientAccounts || (checkExistingPatientAccounts && checkExistingPatientAccounts.length === 0)) {
+						await Patient(sequelize).create(patientSample as unknown as PatientStatic["dataValues"], { transaction: t });
+					}
+
 					logger.info("Default Tables UP");
 					return true;
 				});

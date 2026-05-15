@@ -1,14 +1,14 @@
 //import { authenticatedUser } from "./account.routes.js";
 import { publicAdminRoutes } from "./publicAdmin.routes.js";
 import { requestParser, Router } from "@medlink/common";
-import { publicClientUsers } from "./publicClientUsers.routes.js";
+import { publicPatientUsers } from "./publicPatientUsers.routes.js";
 import { refreshAccessToken } from "../../../controllers/token.auth.controller.js";
 import config from "../../../../app.config.js";
 
 const router = Router();
 
-// Platform uses a combined Client and Delivery Partner user access in endpoints
-router.use(publicClientUsers.routes());
+// Platform uses Patient user access in endpoints
+router.use(publicPatientUsers.routes());
 
 // Admin access endpoints
 router.use(publicAdminRoutes.routes());
@@ -20,7 +20,7 @@ router.use(publicAdminRoutes.routes());
  * /token/refresh:
  *   post:
  *     tags:
- *       - Client Users
+ *       - Patient Users
  *       - Admin Users
  *     summary: Refresh an expired access token using the refresh token
  *     description: "Existing refresh token must be provided for a request to be valid. The refresh token can be provided in any of request header using 'x-refreshToken', in request body as 'refreshToken' or url query with value set to 'refreshToken'. Once validated, a new access token and new refresh token would be returned; previous refresh token becomes invalid"

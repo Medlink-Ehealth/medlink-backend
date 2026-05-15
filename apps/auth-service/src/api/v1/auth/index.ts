@@ -1,6 +1,6 @@
 import { Router, authenticateEncryptedToken, statusCodes } from "@medlink/common";
 import { adminRoutes } from "./admin/index.js";
-import { clientRoutes } from "./client/index.js";
+import { patientRoutes } from "./patient/index.js";
 import { usersCommonEndpoints } from "./common/index.js";
 
 const router = Router("auth");
@@ -62,7 +62,7 @@ router.use(usersCommonEndpoints.routes());
 
 // Admin specific account routes
 router.use(adminRoutes.routes());
-// Client specific account routes
-router.use(clientRoutes.routes());
+// Patient specific account routes
+router.use(patientRoutes.routes());
 
 export { router as authRouter };

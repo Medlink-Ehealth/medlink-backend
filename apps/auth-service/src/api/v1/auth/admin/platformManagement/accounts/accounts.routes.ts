@@ -11,25 +11,26 @@ import {
 	requestParser,
 	statusCodes,
 	throwError,
+	Admin,
+	AdminRole,
+	Patient,
+	UserSetting,
 } from "@medlink/common";
-
+import { AdminStatic, PatientStatic } from "@medlink/types";
 import validator from "validator";
-import { Admin, AdminRole, Client, UserSetting } from "../../../../../../models/accounts/index.js";
 import { ModelStatic, Sequelize } from "sequelize";
-import { AdminStatic } from "../../../../../../models/accounts/Admin.model.js";
-import { ClientStatic } from "../../../../../../models/accounts/Client.model.js";
-import { AdminUser, ClientUser } from "../../../../../../@types/Models.js";
+import { AdminUser, PatientUser } from "../../../../../../../../../common/src/@types/Models.js";
 import { createNewAccount } from "../../../../../../controllers/createNewAccount.controller.js";
 import { adminFormValidator } from "../../../../../../validators/adminFormValidator.js";
-import { clientFormValidator } from "../../../../../../validators/clientFormValidator.js";
+import { patientFormValidator } from "../../../../../../validators/patientFormValidator.js";
 
 const router = Router();
 
 const userTypesModelMap = {
 	admin: "Admin",
 	admins: "Admin",
-	client: "Client",
-	clients: "Client",
+	patient: "Patient",
+	patients: "Patient",
 };
 
 /*
@@ -59,7 +60,7 @@ router.use(
  *     tags:
  *       - Platform users & accounts management (Admin)
  *     summary: Fetch one or all existing registered user accounts.
- *     description: "Fetch one or all registered accounts whether Clients, Delivery Partners or Admin accounts. Filter through filters using URL queries. Worthy note: it's not possible to query by roleLabel (does not exist on the user Model) for admin users because this is handled internally to interpret a role number; hence query by the Role Number instead if needed."
+ *     description: "Fetch one or all registered accounts whether Patients or Admin accounts. Filter through filters using URL queries. Worthy note: it's not possible to query by roleLabel (does not exist on the user Model) for admin users because this is handled internally to interpret a role number; hence query by the Role Number instead if needed."
  *     security:
  *       - Token: []
  *     parameters:
@@ -114,8 +115,7 @@ router.use(
  *                   items:
  *                     anyOf:
  *                       - $ref: "#/components/schemas/Admin"
- *                       - $ref: "#/components/schemas/Client"
- *                       - $ref: "#/components/schemas/DeliveryPartner"
+ *                       - $ref: "#/components/schemas/Patient"
  *               example:
  *                 status: 200
  *                 data:
@@ -140,7 +140,7 @@ router.use(
  *                     email: stella-kudi@riideon.com
  *                     state: true
  *                     verified: true
- *                     'type': 'client'
+ *                     'type': 'patient'
  *                     created: 2024-12-05T15:00:00.151Z
  *                     updated: 2024-12-05T17:00:00.151Z
  *       400:
@@ -176,7 +176,7 @@ router.get(
 				: Array.isArray(importedUserType) && userTypesModelMap[importedUserType[0] as "admin"] // only checking that 1st item in query array exists in prefined types mapper
 					? importedUserType
 					: undefined
-			: ["admin", "client", "delivery_partner"];
+			: ["admin", "patient"];
 
 		// console.log("importedUserType", importedUserType);
 		// console.log("usersType", usersType);
@@ -194,9 +194,9 @@ router.get(
 						if (type) {
 							type = type.trim().toLowerCase();
 							if (!userTypesModelMap[type as "admin"]) return [];
-							const typeModel = (type === "admin" || type === "admins" ? Admin : Client) as (
+							const typeModel = (type === "admin" || type === "admins" ? Admin : Patient) as (
 								db: Sequelize,
-							) => ModelStatic<AdminStatic | ClientStatic>;
+							) => ModelStatic<AdminStatic | PatientStatic>;
 							return await typeModel(ctx.sequelizeInstance!)
 								.scope("management")
 								.findAll({
@@ -248,7 +248,7 @@ router.get(
 				if (users) {
 					const groupUsersByType: {
 						admins?: AdminUser[] | [];
-						clients?: ClientUser[] | [];
+						patients?: PatientUser[] | [];
 					} = {};
 
 					users.map((usersGroup, index) => {
@@ -259,7 +259,7 @@ router.get(
 							groupUsersByType[key] = usersGroup.map((account) => {
 								const thisAccount = account.toJSON() as AdminUser;
 								if (UsersAccessTimestamps[thisAccount.uuid]) {
-									thisAccount['access' as 'firstName'] = UsersAccessTimestamps[thisAccount.uuid] as any;
+									thisAccount["access" as "firstName"] = UsersAccessTimestamps[thisAccount.uuid] as any;
 								}
 								if (UserRoles && UserRoles.length)
 									for (let i = 0; i < UserRoles.length; i++) {
@@ -317,7 +317,7 @@ router.get(
  *         schema:
  *           type: string
  *           default: admin
- *           enum: ['user', 'admin', 'client', 'delivery_partner']
+ *           enum: ['user', 'admin', 'patient']
  *         description: "userType is required here. Where query 'type' is preferred for declaring user account type, simply use 'user' as placeholder here"
  *       - in: path
  *         name: email
@@ -344,8 +344,7 @@ router.get(
  *                   description: User account data object
  *                   oneOf:
  *                     - $ref: "#/components/schemas/Admin"
- *                     - $ref: "#/components/schemas/Client"
- *                     - $ref: "#/components/schemas/DeliveryPartner"
+ *                     - $ref: "#/components/schemas/Patient"
  *               example:
  *                 status: 200
  *                 data:
@@ -386,7 +385,7 @@ router.get(
 		) {
 			ctx.status = statusCodes.BAD_REQUEST;
 			ctx.message =
-				"Account type missing. Define as either 'admin', 'client' or 'delivery_partner' either in the endpoint or as a URL query like type=admin";
+				"Account type missing. Define as either 'admin', 'patient' either in the endpoint or as a URL query like type=admin";
 			return;
 		}
 		if (!validator.isEmail(email)) {
@@ -458,7 +457,7 @@ router.get(
  *     tags:
  *       - Platform users & accounts management (Admin)
  *     summary: Create a new user account.
- *     description: "Create a new user (client, admin, Delivery partner) account. Only a 'Admin (Top-Level Management)' (level:3) user would be able to do this"
+ *     description: "Create a new user (patient, admin) account. Only a 'Admin (Top-Level Management)' (level:3) user would be able to do this"
  *     security:
  *       - Token: []
  *     parameters:
@@ -469,7 +468,7 @@ router.get(
  *         schema:
  *           type: string
  *           default: admin
- *           enum: ['user', 'admin', 'client', 'delivery_partner']
+ *           enum: ['user', 'admin', 'patient']
  *         description: "userType is required here. Where query 'type' is preferred for declaring user account type, simply use 'user' as placeholder here"
  *       - in: query
  *         name: type
@@ -517,8 +516,7 @@ router.get(
  *                   description: Contains an arrray of accounts
  *                   Oneof:
  *                     - $ref: "#/components/schemas/Admin"
- *                     - $ref: "#/components/schemas/Client"
- *                     - $ref: "#/components/schemas/DeliveryPartner"
+ *                     - $ref: "#/components/schemas/Patient"
  *               example:
  *                 status: 201
  *                 data:
@@ -564,19 +562,19 @@ router.post(
 		) {
 			ctx.status = statusCodes.BAD_REQUEST;
 			ctx.message =
-				"Account type missing. Define as either 'admin', 'client' or 'delivery_partner' either in the endpoint or as a URL query like type=admin";
+				"Account type missing. Define as either 'admin', 'patient' either in the endpoint or as a URL query like type=admin";
 			return;
 		} else {
 			const type = userTypesModelMap[usersType as "admin"];
 			ctx.state.userType = type;
 			if (type === "Admin") {
 				await adminFormValidator.createAccount(ctx, next);
-			} else if (type === "Client") {
-				await clientFormValidator.createAccount(ctx, next);
-			}  else {
+			} else if (type === "Patient") {
+				await patientFormValidator.createAccount(ctx, next);
+			} else {
 				ctx.status = statusCodes.BAD_REQUEST;
 				ctx.message =
-					"Account type missing. Define as either 'admin', 'client' or 'delivery_partner' either in the endpoint or as a URL query like type=admin";
+					"Account type missing. Define as either 'admin', 'patient' either in the endpoint or as a URL query like type=admin";
 				return;
 			}
 		}
@@ -647,7 +645,7 @@ router.post(
  *         schema:
  *           type: string
  *           default: admin
- *           enum: ['user', 'admin', 'client', 'delivery_partner']
+ *           enum: ['user', 'admin', 'patient']
  *         description: "userType is required here. Where query 'type' is preferred for declaring user account type, simply use 'user' as placeholder here"
  *       - in: path
  *         name: email
@@ -715,7 +713,7 @@ router.get(["/user/:email/action/:action", "/:usersType/:email/action/:action"],
 	) {
 		ctx.status = statusCodes.BAD_REQUEST;
 		ctx.message =
-			"Account type missing. Define as either 'admin', 'client' or 'delivery_partner' either in the endpoint or as a URL query like type=admin";
+			"Account type missing. Define as either 'admin', 'patient' either in the endpoint or as a URL query like type=admin";
 		return;
 	}
 
@@ -968,7 +966,7 @@ router.patch(["/user/:email/role", "/:usersType/:email/role"], async (ctx) => {
  *         schema:
  *           type: string
  *           default: admin
- *           enum: ['user', 'admin', 'client', 'delivery_partner']
+ *           enum: ['user', 'admin', 'patient']
  *         description: "userType is required here. Where query 'type' is preferred for declaring user account type, simply use 'user' as placeholder here"
  *       - in: path
  *         name: email
@@ -1028,7 +1026,7 @@ router.delete(["/user/:email", "/user/:email/delete", "/:usersType/:email", "/:u
 	) {
 		ctx.status = statusCodes.BAD_REQUEST;
 		ctx.message =
-			"Account type missing. Define as either 'admin', 'client' or 'delivery_partner' either in the endpoint or as a URL query like type=admin";
+			"Account type missing. Define as either 'admin', 'patient' either in the endpoint or as a URL query like type=admin";
 		return;
 	}
 

@@ -661,15 +661,18 @@ const updateAccount = (options?: { userType?: string }) => async (ctx: extendedP
 		if (user) {
 			//remove former avatar from server if avatar keys exists
 			let errorRemovingFormerAvatar = false;
-			if (user.dataValues.avatar && ctx.request.body.avatar) {
-				fs.unlink(process.cwd() + user.dataValues.avatar, (err: unknown) => {
+			if ((user.dataValues.avatar && ctx.request.body.avatar) || (user.dataValues.picture && ctx.request.body.picture)) {
+				const avatarId = user.dataValues.avatar || user.dataValues.picture;
+				fs.unlink(process.cwd() + avatarId, (err: unknown) => {
 					if (err) errorRemovingFormerAvatar = true;
 				});
 			}
 			// Clean up image if new upload unsuccessful
 			if (errorRemovingFormerAvatar) {
+				const avatarId = ctx.request.body.avatar || ctx.request.body.picture;
 				delete ctx.request.body.avatar;
-				fs.unlinkSync(process.cwd() + ctx.request.body.avatar);
+				delete ctx.request.body.picture;
+				fs.unlinkSync(process.cwd() + avatarId);
 			}
 			const updatedUser = await user.update(ctx.request.body);
 			ctx.state.updatedUser = updatedUser.toJSON();

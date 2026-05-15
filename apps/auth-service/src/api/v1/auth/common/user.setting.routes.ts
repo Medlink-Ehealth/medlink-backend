@@ -15,9 +15,9 @@ import {
 	OTP,
 	JsonObject,
 	defaultMailTemplate,
+	UserSetting,
 } from "@medlink/common";
 import validator from "validator";
-import { UserSetting } from "../../../../models/accounts/UserSetting.model.js";
 import config from "../../../../../app.config.js";
 
 const router = Router("setting");

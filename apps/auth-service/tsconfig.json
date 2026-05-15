@@ -14,8 +14,7 @@
 		"redis.config.ts",
 		"app.config.ts",
 		"app.swagger.ts",
-		"src/**/*.ts"
-	],
+		"src/**/*.ts"	],
 	"exclude": ["node_modules", "dist", "**/*.test.ts", "**/*.spec.ts"],
 	"references": [{ "path": "../../common" }]
 }
