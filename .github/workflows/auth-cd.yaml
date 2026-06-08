@@ -1,0 +1,29 @@
+name: Auth Service CD
+
+on:
+  push:
+    branches:
+        - main
+        - feature/*
+  pull_request:
+    branches:
+        - main
+        - feature/*
+    
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+  actions: read
+  security-events: write
+
+jobs:
+  Auth-Service-CD-Dev:
+    uses: Medlink-Ehealth/pipeline-templates/.github/workflows/shared-cd.yml@main
+    with:
+      dockerfile-path: './apps/auth-service/Dockerfile'
+      working-directory: './apps/auth-service'
+      acr-login-server: 'crmedlinkdev001'
+      image-name: 'auth-service'
+    secrets: inherit
