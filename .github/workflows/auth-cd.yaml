@@ -22,8 +22,9 @@ jobs:
   Auth-Service-CD-Dev:
     uses: Medlink-Ehealth/pipeline-templates/.github/workflows/shared-cd.yml@main
     with:
-      dockerfile-path: './apps/auth-service/Dockerfile'
-      working-directory: './apps/auth-service'
-      acr-login-server: 'crmedlinkdev001'
-      image-name: 'auth-service'
+      cluster-name: 'aks-medlink-dev-001'
+      resource-group: 'rg-medlink-dev'
+      release-name: 'auth-service-dev'
+      chart-path: './apps/auth-service/helm'
+      image-repository: 'crmedlinkdev001.azurecr.io/auth-service'
     secrets: inherit
