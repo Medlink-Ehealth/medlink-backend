@@ -17,5 +17,11 @@ env:
 autoscaling:
   enabled: false
 
+tolerations:
+  - key: "kubernetes.azure.com/scalesetpriority"
+    operator: "Equal"
+    value: "spot"
+    effect: "NoSchedule"
+
 externalSecret:
   name: auth-service-secrets-dev
