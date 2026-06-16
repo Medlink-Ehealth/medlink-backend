@@ -24,6 +24,14 @@ spec:
         {{- include "auth-service.selectorLabels" . | nindent 8 }}
     spec:
       serviceAccountName: {{ include "auth-service.serviceAccountName" . }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
       containers:

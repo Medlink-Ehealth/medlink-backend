@@ -46,6 +46,10 @@ autoscaling:
 
 podAnnotations: {}
 
+tolerations: []
+
+nodeSelector: {}
+
 podSecurityContext:
   runAsNonRoot: true
   runAsUser: 1000
