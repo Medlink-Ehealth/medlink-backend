@@ -4,10 +4,10 @@ on:
   push:
     branches:
         - main
-  pull_request:
-    branches:
-        - main
-        - feature/*
+  # pull_request:
+  #   branches:
+  #       - main
+  #       - feature/*
     
   workflow_dispatch:
 
@@ -26,4 +26,5 @@ jobs:
       release-name: 'auth-service-dev'
       chart-path: './apps/auth-service/helm'
       image-repository: 'crmedlinkdev001.azurecr.io/auth-service'
+      image-tag: 'latest'
     secrets: inherit
