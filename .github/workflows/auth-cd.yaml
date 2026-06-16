@@ -22,7 +22,7 @@ jobs:
     uses: Medlink-Ehealth/pipeline-templates/.github/workflows/shared-cd.yml@main
     with:
       cluster-name: 'aks-medlink-dev'
-      resource-group: 'edlink-dev-rg'
+      resource-group: 'medlink-dev-rg'
       release-name: 'auth-service-dev'
       chart-path: './apps/auth-service/helm'
       image-repository: 'crmedlinkdev001.azurecr.io/auth-service'
