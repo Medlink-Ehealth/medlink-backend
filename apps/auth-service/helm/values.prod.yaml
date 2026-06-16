@@ -1,0 +1,42 @@
+replicaCount: 2
+
+ingress:
+  enabled: true
+  host: auth.medlink.com
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+  tls:
+    - secretName: auth-tls-prod
+      hosts:
+        - auth.medlink.com
+
+resources:
+  requests:
+    cpu: "200m"
+    memory: "256Mi"
+  limits:
+    cpu: "1000m"
+    memory: "512Mi"
+
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 5
+  targetCPUUtilizationPercentage: 70
+
+env:
+  DB_HOST: medlink-postgres-prod
+  DB_NAME: medlink_prod
+  DB_USER: medlink_prod
+  MAIL_SERVER_SMTP_HOST: smtp.zoho.com
+  MAIL_SERVER_AUTH_MAIL: hello@medlink.com
+  MAIL_SERVER_NOREPLY_MAIL: hello@medlink.com
+
+persistence:
+  enabled: true
+  storageClass: managed-premium
+  size: 20Gi
+
+externalSecret:
+  name: auth-service-secrets-prod

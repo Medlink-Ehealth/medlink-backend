@@ -1,0 +1,21 @@
+replicaCount: 1
+
+ingress:
+  enabled: true
+  host: auth.dev.medlink.com
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+
+env:
+  DB_HOST: medlink-postgres-dev
+  DB_NAME: medlink_dev
+  DB_USER: medlink_dev
+  MAIL_SERVER_SMTP_HOST: smtp.zoho.com
+  MAIL_SERVER_AUTH_MAIL: hello@medlink.com
+  MAIL_SERVER_NOREPLY_MAIL: hello@medlink.com
+
+autoscaling:
+  enabled: false
+
+externalSecret:
+  name: auth-service-secrets-dev

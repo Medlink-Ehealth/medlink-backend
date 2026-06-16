@@ -1,0 +1,110 @@
+replicaCount: 1
+
+image:
+  repository: crmedlinkdev.azurecr.io/auth-service
+  tag: latest
+  pullPolicy: Always
+
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  create: true
+  name: ""
+  # Workload Identity annotation — set in environment values files
+  # annotations:
+  #   azure.workload.identity/client-id: <MANAGED_IDENTITY_CLIENT_ID>
+
+service:
+  type: ClusterIP
+  port: 3001
+
+ingress:
+  enabled: false
+  className: nginx
+  annotations: {}
+  host: auth.medlink.local
+  tls: []
+  # tls:
+  #   - secretName: auth-tls
+  #     hosts:
+  #       - auth.medlink.local
+
+resources:
+  requests:
+    cpu: "100m"
+    memory: "256Mi"
+  limits:
+    cpu: "500m"
+    memory: "512Mi"
+
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 3
+  targetCPUUtilizationPercentage: 70
+
+podAnnotations: {}
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  fsGroup: 1000
+
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: false
+  capabilities:
+    drop:
+      - ALL
+
+livenessProbe:
+  httpGet:
+    path: /health
+    port: http
+  initialDelaySeconds: 30
+  periodSeconds: 15
+  failureThreshold: 3
+
+readinessProbe:
+  httpGet:
+    path: /health
+    port: http
+  initialDelaySeconds: 10
+  periodSeconds: 10
+  failureThreshold: 3
+
+# Non-sensitive environment variables — injected via ConfigMap
+env:
+  NODE_ENV: production
+  PORT: "3001"
+  DIALECT: postgres
+  DB_PORT: "5432"
+  DB_SCHEMA: public
+  MAIL_SERVER_SECURE_STATE: "true"
+  MAIL_SERVER_SMTP_PORT: "465"
+  CONVERSATION_MEDIA_STORAGE: local
+  CONVERSATION_MEDIA_STORAGE_PATH: site/files/global
+  SOCKET_IO: '["HTTP","HTTPS"]'
+  tempFolder: site/files/temp
+  globalPath: site/files/global
+  privatePath: site/files/auth
+  tempPrivateFolder: site/files/auth/temp
+  settings: site/settings
+  # DB_HOST, DB_NAME, DB_USER — set per environment in values.dev.yaml / values.prod.yaml
+  # MAIL_SERVER_SMTP_HOST, MAIL_SERVER_AUTH_MAIL, MAIL_SERVER_NOREPLY_MAIL — set per environment
+  # REDIS_CLIENT — optional; set to '["redis-host",6379]' if Redis is in use
+
+# Name of the Kubernetes Secret that must exist in the namespace before deploy.
+# Contains: DB_USER, DB_PASS, COOKIE_IDENTIFIER, COOKIE_KEYS, JWT_SECRET_KEY,
+#           APP_PASETO_KEY, MAIL_SERVER_AUTH_PASS, MAIL_SERVER_NOREPLY_PASS,
+#           googleID, googleSECRET, fbID, fbSECRET
+externalSecret:
+  name: auth-service-secrets
+
+# Persistent volume for user-uploaded files under /app/site/files
+persistence:
+  enabled: true
+  storageClass: ""   # leave empty to use the cluster default (Azure managed disk)
+  size: 5Gi
+  accessMode: ReadWriteOnce
