@@ -23,8 +23,10 @@ jobs:
     with:
       cluster-name: 'aks-medlink-dev'
       resource-group: 'medlink-dev-rg'
+      namespace: 'dev'
       release-name: 'auth-service-dev'
       chart-path: './apps/auth-service/helm'
+      values-file: './apps/auth-service/helm/values.dev.yaml'
       image-repository: 'crmedlinkdev001.azurecr.io/auth-service'
       image-tag: 'latest'
     secrets: inherit
