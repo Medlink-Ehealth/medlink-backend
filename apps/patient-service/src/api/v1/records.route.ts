@@ -79,37 +79,28 @@ router.get(
 			return;
 		}
 		//Ensure only a priviledged active admin user is able to do this
-		if (!ctx.state.user || ctx.state.user.type !== "admin" || ctx.state.user.role! > 0) {
+		if (!ctx.state.user || ctx.state.user.type !== "admin" || !ctx.state.user.role || Number(ctx.state.user.role) < 1) {
 			ctx.status = statusCodes.UNAUTHORIZED;
 			ctx.message = "Unauthorised. You do not have access to these informations";
 			return;
 		} else await next();
 	},
-	async (ctx, next) => {
-		if (ctx.path === ctx.url) {
-			ctx.url = ctx.url + "?sort=[created=ASC]&limit=10";
-		}
-		await next();
-	},
 	dbQuerier({ ignoreStateFiltration: true, useOlderImplementation: false }),
 	async (ctx) => {
 		// managed include props
-		const targetedUser: Includeable = {
-			model: Patient(ctx.sequelizeInstance!),
-			required: true,
-			where: { uuid: ctx.params["patientUuid"] },
-			include: [Visit(ctx.sequelizeInstance!), PatientDocument(ctx.sequelizeInstance!)],
-		};
+		const targetedUser: Includeable[] = [Visit(ctx.sequelizeInstance!), PatientDocument(ctx.sequelizeInstance!)];
 
 		if (ctx.state.dbQuerier["include"]) {
-			if (Array.isArray(ctx.state.dbQuerier["include"])) ctx.state.dbQuerier["include"].concat([targetedUser]);
+			if (Array.isArray(ctx.state.dbQuerier["include"])) ctx.state.dbQuerier["include"].concat(targetedUser);
 			else if (typeof ctx.state.dbQuerier["include"] === "object")
-				ctx.state.dbQuerier["include"] = [ctx.state.dbQuerier["include"], targetedUser];
+				ctx.state.dbQuerier["include"] = [ctx.state.dbQuerier["include"]].concat(targetedUser);
 		} else
 			ctx.state.dbQuerier = {
 				...ctx.state.dbQuerier,
-				include: [targetedUser],
+				include: targetedUser,
 			};
+
+		ctx.state.dbQuerier.where = { ...ctx.state.dbQuerier.where, uuid: ctx.params["patientUuid"] };
 
 		const profile = await Patient(ctx.sequelizeInstance!).findOne(ctx.state.dbQuerier);
 

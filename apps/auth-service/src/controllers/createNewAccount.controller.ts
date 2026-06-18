@@ -1,6 +1,4 @@
 import { Next } from "koa";
-import { Patient } from "../../../../common/src/models/accounts/Patient.model.js";
-import { Op } from "sequelize";
 import {
 	AppContext,
 	getOffsetTimestamp,
@@ -10,6 +8,7 @@ import {
 	newUserAccountCreationTemplate,
 	otpLinkGenerator,
 	statusCodes,
+	Patient,
 } from "@medlink/common";
 import config from "../../app.config.js";
 

@@ -19,13 +19,14 @@ import {
 	hashPassword,
 	UserAccessTimestamp,
 	OTP,
+	Cache,
+	redis,
 } from "@medlink/common";
 
 import fs from "node:fs";
 import compose from "koa-compose";
 import { Op, Sequelize } from "sequelize";
 import config from "../../app.config.js";
-import { Cache, redis } from "../performance.controller.js";
 
 const { googleID, googleSECRET, fbID, fbSECRET } = process.env;
 

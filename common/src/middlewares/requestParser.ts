@@ -3,7 +3,7 @@ import { media } from "../config/koabody.config.js";
 import { logger } from "../utils/logger.js";
 import { statusCodes } from "../constants/index.js";
 import compose from "koa-compose";
-import { ParameterizedContext, Next, DefaultState, DefaultContext } from "koa";
+import { Next } from "koa";
 import { RouterExtendedDefaultContext } from "./router.js";
 /*
 	mediaType defines the kind/type of media available in koabody.config.js
@@ -11,7 +11,7 @@ import { RouterExtendedDefaultContext } from "./router.js";
 	when mediaType is boolean 'true', media type is taken as image excpet explicitly defined as a media string type
  */
 interface Options extends Partial<KoaBodyMiddlewareOptions> {
-	processMedia?: "image" | "video" | ("image" | "video")[];
+	processMedia?: "image" | "video" | "file" | ("image" | "video" | "file")[];
 }
 type JsonValue = string | number | boolean | null | undefined | JsonObject | JsonArray;
 type JsonObject = {

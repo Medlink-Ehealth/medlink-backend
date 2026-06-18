@@ -52,7 +52,7 @@ const modelsSync = async (sequelize: Sequelize) => {
 		await Visit(sequelize).sync({ alter: true });
 		await PatientDocument(sequelize).sync({ alter: true });
 
-		logger.info("All tables synced as needed!");
+		logger.info("All PATIENCE-SERVICE tables synced as needed!");
 	} catch (err) {
 		logger.error(err);
 	}

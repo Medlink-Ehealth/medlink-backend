@@ -55,7 +55,7 @@ router.get(
 	dbQuerier({ ignoreStateFiltration: true, useOlderImplementation: false }),
 	async (ctx) => {
 		// managed include props
-		const signedUser:Includeable = {
+		const signedUser: Includeable = {
 			model: Patient(ctx.sequelizeInstance!),
 			required: true,
 			where: { uuid: ctx.state.user.uuid },
@@ -70,10 +70,12 @@ router.get(
 				include: [signedUser],
 			};
 
+		// console.log("signedUser: ", signedUser);
+		// console.log("ctx.state.dbQuerier: ", ctx.state.dbQuerier);
 		// fetch visit history
 		try {
 			const visits = await Visit(ctx.sequelizeInstance!).findAll(ctx.state.dbQuerier);
-			if (visits && visits[0] instanceof Patient(ctx.sequelizeInstance!)) {
+			if (visits && visits[0] instanceof Visit(ctx.sequelizeInstance!)) {
 				ctx.status = statusCodes.OK;
 				ctx.body = {
 					status: statusCodes.OK,

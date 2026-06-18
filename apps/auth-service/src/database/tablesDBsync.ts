@@ -52,7 +52,7 @@ const modelsSync = async (sequelize: Sequelize) => {
 			await AdminRole(sequelize).bulkCreate(roles, { transaction: t });
 		});
 
-		logger.info("All tables synced as needed!");
+		logger.info("All AUTH-SERVICE tables synced as needed!");
 	} catch (err) {
 		logger.error(err);
 		//logger.error(JSON.stringify(err, null, 2));

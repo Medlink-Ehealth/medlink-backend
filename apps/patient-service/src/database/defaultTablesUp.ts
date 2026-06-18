@@ -1,4 +1,4 @@
-import { hashPassword, logger, sequelizeInstances } from "@medlink/common";
+import { hashPassword, logger, Patient, sequelizeInstances } from "@medlink/common";
 import { Provider, ProviderStatic } from "../models/Provider.model.js";
 import { Visit } from "../models/Visit.model.js";
 
@@ -9,13 +9,6 @@ async function defaultTablesUp() {
 		try {
 			for (const sequelize of instances) {
 				await sequelize.transaction(async (t) => {
-					// call auth-service defaults to check if sample data exists. This file has been copied to this smae dir as this file: defaultTablesOn-Auth-Service.ts
-
-					try {
-						await import("./defaultTablesOn-Auth-Service.js"); // iniitaite
-						logger.info("Auth service initiated");
-					} catch (err) {}
-
 					// do patient service specific if needed
 					//providers sample
 					const checkExistingProviders = await Provider(sequelize).findAll({
@@ -36,13 +29,17 @@ async function defaultTablesUp() {
 						transaction: t,
 					});
 					if (!checkExistingVisitData || (checkExistingVisitData && checkExistingVisitData.length === 0)) {
-						await Visit(sequelize).create(
-							{
-								comment: "Here we gp fopr this visitation. This is a dummy comment to show that visit data can be retrieved.",
-								commentBy: "Akin",
-							},
-							{ transaction: t },
-						);
+						// get a patient uuid
+						const patient = await Patient(sequelize).findOne({ transaction: t });
+						if (patient)
+							await Visit(sequelize).create(
+								{
+									patient: patient.dataValues.uuid,
+									comment: "Here we go for this visitation. This is a dummy comment to show that visit data can be retrieved.",
+									commentBy: "Akin",
+								},
+								{ transaction: t },
+							);
 					}
 
 					logger.info("Default Tables for PATIENT SERVICE Populated");
@@ -51,7 +48,7 @@ async function defaultTablesUp() {
 			}
 			return true;
 		} catch (err) {
-			logger.error({ on: "Default models", log: err });
+			logger.error("Error, Default models: ", err);
 			console.log("Error, Default models: ", err);
 			//return err;
 		}

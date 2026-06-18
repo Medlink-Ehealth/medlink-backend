@@ -12,7 +12,7 @@
 			"@medlink/common": ["./common/src/index.ts"],
 			"@medlink/common/*": ["./common/src/*"],
 			"@medlink/types": ["./common/src/@types/index.ts"],
-			"@medlink/config": ["./common/src/platform.config.ts"]
+			"@medlink/common/config": ["./common/src/platform.config.ts"]
 		}
 	},
 	"include": ["./common/types"],

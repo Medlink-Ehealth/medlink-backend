@@ -17,6 +17,8 @@ import {
 	UserSecurity,
 	JsonObject,
 	defaultMailTemplate,
+	redis,
+	Cache,
 } from "@medlink/common";
 
 import { patientFormValidator } from "../../../../validators/patientFormValidator.js";
@@ -26,7 +28,6 @@ import validator from "validator";
 import { adminFormValidator } from "../../../../validators/adminFormValidator.js";
 import config from "../../../../../app.config.js";
 import { updateAccount } from "../../../../controllers/account.controller.js";
-import { Cache, redis } from "../../../../performance.controller.js";
 import Redis from "ioredis";
 
 const router = Router();

@@ -7,7 +7,7 @@
 
 - **Configuration:** A base config file called `platform.config` controls all services. This is imported to each service as `app.config`, allowing for per-service overrides.
 
-- **Database:** Each service is set up to use **SQLite** as aa lightweight database, and forgoing the need for service hosted DB like postgres. However any database can easily be configured for each service my defining this preference in env settings. See the "How To" section for more on this.
+- **Database:** Each service is set up to use **SQLite** as a lightweight database, and forgoing the need for service hosted DB like `postgres` in dev mode. However any database can easily be configured for each service my defining this preference in `env` settings. See the `Database Options` section for more on this. ```(A sample dev sqlite DB file 'dbInit.sqlite3' is now included with source code - Keep in mind data may change and do not exclusive rely on this; instead create your own version)```
 
 ---
 
@@ -18,6 +18,14 @@ Access the Swagger documentation at: `<server address>/<api version>/docs`
 ---
 
 ## 🛠 How To
+- **To Run production APP:** 
+  Run below for each micro-service to start-up production app:
+  ```bash
+  pnpm run prod:<service>
+  ```
+  - **Example:** `pnpm run prod:auth`
+  - Review the succeeding sections for production build directions (Note: this readme does not include containerization steps).
+
 - **Run Development Environment:** 
   ```bash
   pnpm run dev
@@ -40,7 +48,7 @@ Access the Swagger documentation at: `<server address>/<api version>/docs`
   pnpm run <service>:db:tup
   ```
   *Seed files are located in `src/database/defaultTablesUp`.*
-
+   
 - **Development or Feature integration:** 
   You should preferably stay in the **root directory** and use the --filter flag. You almost never need to cd into the service directories to run commands.
 
@@ -55,7 +63,7 @@ Access the Swagger documentation at: `<server address>/<api version>/docs`
    > - Use the **root `package.json`** only for repo-wide tools (Prettier, ESLint, TypeScript)
    > - Or for Global scripts like: `"build:all": "pnpm -r run build"`
 
-- **Production deployment:** 
+- **Production build:** 
   Building will transpile to /dist directory in both `/<service name>-service`, and `/common` directories. So the deployment process would need to ensure that both a specific service and common are deployed.
   - ⁠Ensure theses directories are included in a`/<service name>-service`: `dist`, `site` and `package.json` (if you intend to do remote build step during the deployment), otherwise also include `node_modules`
   - Similarly for common, you will need `dist` and `package.json`.
@@ -129,10 +137,12 @@ For local files management, the following can be used to group uploaded files. A
 
 ### Database Options
 
+  - When using `SQLite` for testing, you may want to place the `sql file` outside any app service directory to create a central db for all services. If DB is left relative to each service, DB information would be different and will not sync. For instance, a patient information would differ and it would be impossible to sign-in a user on Patient-service after creation on Auth-service. The only workaround this would be to ensure same DB is used as advised. In PROD, the same database server should realistically be used for all connecting micro-services.
+  
 | Key | Description |
 | :--- | :--- |
 | `DIALECT` | Sequelize is used internally as ORM and any Dialect supported by Sequelize (sqlite, postgres, mysql) can be used here. During development, `sqlite` is used for simplicity. |
-| `DB_STORAGE` | Path for SQLite file. Only needed when sqlite is used. |
+| `DB_STORAGE` | Path for SQLite file. Only needed when sqlite is used. Set to `"../dbInit.sqlite3"` in each service `.env` for lightweight testing. VSCode extension `SQLite` by `alexcvzz` can be installed for a UI to review DB tables/data |
 | `DB_HOST` | DB host address - Ignore for sqlite  |
 | `DB_PORT` | DB listening port - Ignore for sqlite  |
 | `DB_USER` | DB credential - Ignore for sqlite  |
