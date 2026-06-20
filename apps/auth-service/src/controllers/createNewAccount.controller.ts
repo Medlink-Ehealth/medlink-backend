@@ -1,5 +1,5 @@
 import { Next } from "koa";
-import { Patient } from "../../../../common/src/models/accounts/Patient.model.js";
+import { Patient } from "@medlink/common";
 import { Op } from "sequelize";
 import {
 	AppContext,
