@@ -50,6 +50,13 @@ tolerations: []
 
 nodeSelector: {}
 
+# Azure Key Vault Secrets Store CSI Driver
+keyVault:
+  enabled: false
+  name: ""        # e.g. kv-medlink-dev
+  tenantId: ""    # Azure tenant ID
+  clientId: ""    # Managed Identity client ID
+
 podSecurityContext:
   runAsNonRoot: true
   runAsUser: 1000

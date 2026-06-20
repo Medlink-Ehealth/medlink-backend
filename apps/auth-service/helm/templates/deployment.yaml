@@ -22,6 +22,9 @@ spec:
         {{- end }}
       labels:
         {{- include "auth-service.selectorLabels" . | nindent 8 }}
+        {{- if .Values.keyVault.enabled }}
+        azure.workload.identity/use: "true"
+        {{- end }}
     spec:
       serviceAccountName: {{ include "auth-service.serviceAccountName" . }}
       {{- with .Values.tolerations }}
@@ -60,6 +63,11 @@ spec:
               mountPath: /app/site/files
             - name: settings
               mountPath: /app/site/settings
+            {{- if .Values.keyVault.enabled }}
+            - name: secrets-store
+              mountPath: /mnt/secrets-store
+              readOnly: true
+            {{- end }}
       volumes:
         - name: files
           {{- if .Values.persistence.enabled }}
@@ -70,3 +78,11 @@ spec:
           {{- end }}
         - name: settings
           emptyDir: {}
+        {{- if .Values.keyVault.enabled }}
+        - name: secrets-store
+          csi:
+            driver: secrets-store.csi.k8s.io
+            readOnly: true
+            volumeAttributes:
+              secretProviderClass: {{ include "auth-service.fullname" . }}
+        {{- end }}
