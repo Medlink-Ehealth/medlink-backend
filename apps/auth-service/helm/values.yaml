@@ -96,6 +96,7 @@ env:
   MAIL_SERVER_SMTP_PORT: "465"
   CONVERSATION_MEDIA_STORAGE: local
   CONVERSATION_MEDIA_STORAGE_PATH: site/files/global
+  MEDIA_STORAGE: local
   SOCKET_IO: '["HTTP","HTTPS"]'
   tempFolder: site/files/temp
   globalPath: site/files/global
