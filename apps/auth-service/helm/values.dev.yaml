@@ -25,3 +25,9 @@ tolerations:
 
 externalSecret:
   name: auth-service-secrets-dev
+
+keyVault:
+  enabled: true
+  name: kv-medlink-dev
+  tenantId: 562608dd-cd22-47d6-8eb4-6e9eba231422
+  clientId: 7271016c-082b-43e1-aa6a-3030dda01fb7    
