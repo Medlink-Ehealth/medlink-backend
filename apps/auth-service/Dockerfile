@@ -51,7 +51,8 @@ RUN mkdir -p site/files/global \
              site/files/auth \
              site/files/auth/temp \
              site/files/temp \
-             site/settings
+             site/settings \
+             logs
 
 RUN addgroup -S medlink && adduser -S medlink -G medlink \
     && chown -R medlink:medlink /app
