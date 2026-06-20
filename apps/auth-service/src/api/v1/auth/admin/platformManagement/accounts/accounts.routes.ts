@@ -16,10 +16,10 @@ import {
 	Patient,
 	UserSetting,
 } from "@medlink/common";
-import { AdminStatic, PatientStatic } from "@medlink/types";
+import { AdminStatic, PatientStatic } from "@medlink/common/types";
 import validator from "validator";
 import { ModelStatic, Sequelize } from "sequelize";
-import { AdminUser, PatientUser } from "../../../../../../../../../common/src/@types/Models.js";
+import { AdminUser, PatientUser } from "@medlink/common";
 import { createNewAccount } from "../../../../../../controllers/createNewAccount.controller.js";
 import { adminFormValidator } from "../../../../../../validators/adminFormValidator.js";
 import { patientFormValidator } from "../../../../../../validators/patientFormValidator.js";

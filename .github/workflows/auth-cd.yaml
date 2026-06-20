@@ -2,12 +2,12 @@ name: Auth Service CD
 
 on:
   push:
-    branches:
-        - main
-  # pull_request:
   #   branches:
   #       - main
-  #       - feature/*
+  # # pull_request:
+  # #   branches:
+  # #       - main
+  # #       - feature/* az aks get-credentials -g medlink-dev-rg -n aks-medlink-dev
     
   workflow_dispatch:
 

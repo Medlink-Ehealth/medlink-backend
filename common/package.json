@@ -4,15 +4,19 @@
   "version": "1.0.0",
   "type": "module",
   "files": ["dist"],
-  "main": "./dist/index.js",
+  "main": "./dist/src/index.js",
   "exports": {
     ".": {
-      "import": "./dist/index.js",
-      "types": "./dist/index.d.ts"
+      "import": "./dist/src/index.js",
+      "types": "./dist/src/index.d.ts"
     },
     "./config": {
-      "import": "./dist/platform.config.js",
-      "types": "./dist/platform.config.d.ts"
+      "import": "./dist/src/platform.config.js",
+      "types": "./dist/src/platform.config.d.ts"
+    },
+    "./types": {
+      "import": "./dist/src/@types/index.js",
+      "types": "./dist/src/@types/index.d.ts"
     }
   },
   "private": true,
