@@ -7,9 +7,9 @@ ingress:
     nginx.ingress.kubernetes.io/proxy-body-size: "50m"
 
 env:
-  DB_HOST: medlink-postgres-dev
-  DB_NAME: medlink_dev
-  DB_USER: medlink_dev
+  DB_HOST: psql-medlink-dev.postgres.database.azure.com
+  DB_NAME: medlink
+  DB_USER: medlinkadmin
   MAIL_SERVER_SMTP_HOST: smtp.zoho.com
   MAIL_SERVER_AUTH_MAIL: hello@medlink.com
   MAIL_SERVER_NOREPLY_MAIL: hello@medlink.com
