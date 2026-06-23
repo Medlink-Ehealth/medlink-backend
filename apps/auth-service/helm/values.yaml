@@ -97,6 +97,7 @@ env:
   CONVERSATION_MEDIA_STORAGE: local
   CONVERSATION_MEDIA_STORAGE_PATH: site/files/global
   MEDIA_STORAGE: local
+  DB_SSL: "true"
   SOCKET_IO: '["HTTP","HTTPS"]'
   tempFolder: site/files/temp
   globalPath: site/files/global
